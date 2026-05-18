@@ -583,12 +583,24 @@ let currentKlus = null;
 async function callGemini(parts, options = {}) {
   if (!settings.geminiKey) throw new Error('Geen Gemini API-key ingesteld. Ga naar Instellingen.');
   const generationConfig = {
-    temperature: 0.2,
+    temperature: options.temperature ?? 0.2,
     maxOutputTokens: options.maxTokens || 1024,
     thinkingConfig: { thinkingBudget: options.thinkingBudget ?? 128 }
   };
   if (options.jsonMode) {
     generationConfig.responseMimeType = 'application/json';
+  }
+
+  const body = {
+    contents: [{ parts }],
+    generationConfig
+  };
+
+  // Google Search grounding kan NIET met JSON-modus tegelijk
+  if (options.useSearch && !options.jsonMode) {
+    body.tools = [{ google_search: {} }];
+    // Google adviseert temperature 1.0 voor grounding
+    body.generationConfig.temperature = 1.0;
   }
 
   // Tel het verzoek lokaal
@@ -597,10 +609,7 @@ async function callGemini(parts, options = {}) {
   const res = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(settings.geminiKey)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts }],
-      generationConfig
-    })
+    body: JSON.stringify(body)
   });
   if (!res.ok) {
     let errMsg = `API fout (${res.status})`;
@@ -639,9 +648,16 @@ async function callGemini(parts, options = {}) {
   }
   const text = candidate.content?.parts?.map(p => p.text || '').join('') || '';
   if (!text) throw new Error('Geen tekst in antwoord (finishReason: ' + (candidate.finishReason || 'onbekend') + ')');
-  // Waarschuw als afgekapt
   if (candidate.finishReason === 'MAX_TOKENS') {
     console.warn('Gemini-antwoord is afgekapt door tokenlimiet. Tekst tot nu toe:', text);
+  }
+
+  // Als de aanroeper grounding-metadata wil, geef object terug, anders alleen tekst
+  if (options.returnMetadata) {
+    return {
+      text,
+      groundingMetadata: candidate.groundingMetadata || null
+    };
   }
   return text;
 }
@@ -1256,6 +1272,8 @@ function renderItemForm(main) {
   const isEdit = !!view.editItemId;
   const item = isEdit ? items.find(i => i.id === view.editItemId) : null;
   currentPhoto = item?.photo || null;
+  // Reset of laad bestaande bronnen
+  window._currentSources = item?.sources || null;
 
   const locOptions = locations.map(l =>
     `<option value="${l.id}" ${(item?.locationId || view.locationId) === l.id ? 'selected' : ''}>${escapeHtml(l.name)}</option>`
@@ -1298,9 +1316,7 @@ function renderItemForm(main) {
 
     <div class="card">
       <p class="card-title"><span class="step">3</span> Details</p>
-      <div class="ai-result hidden purple" id="ai-result">
-        <strong>AI-voorstel:</strong> <span id="ai-suggestion-text"></span>
-      </div>
+      <div class="ai-result ${item?.sources ? '' : 'hidden'} purple" id="ai-result"></div>
       <div class="field">
         <label>Naam onderdeel *</label>
         <input type="text" id="item-name" placeholder="Bijv. Sprinklerkop, CV-ketel, Heggenschaar" value="${escapeHtml(item?.name || '')}" />
@@ -1366,6 +1382,12 @@ function renderItemForm(main) {
       <button class="btn btn-primary" onclick="saveItem()">✓ Onderdeel opslaan</button>
     `}
   `;
+
+  // Toon bestaande bronnen als er een opgeslagen advies is
+  if (item?.sources && item.sources.length > 0) {
+    const toelichting = item.notes || 'Eerder gegenereerd advies — wijzig velden om aan te passen.';
+    showAiResult(toelichting, item.sources);
+  }
 }
 
 function renderKlusForm(main) {
@@ -1668,7 +1690,7 @@ function renderSettings(main) {
       ${settings.geminiKey ? `
         <div style="margin-top:12px;padding:10px;background:var(--bg);border-radius:8px;font-size:13px;">
           <strong>Vandaag gebruikt:</strong> ${getAiUsage()} van 250 verzoeken
-          <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Limiet gratis tier: 10 per minuut, 250 per dag. Reset rond 09:00 NL.</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Limiet gratis tier: 10/min, 250/dag. Beeldherkenning met Google Search = 2 verzoeken per scan. Reset rond 09:00 NL.</div>
         </div>
       ` : ''}
     </div>
@@ -1710,7 +1732,7 @@ function renderSettings(main) {
     <div class="card">
       <p class="card-title">ℹ️ Over</p>
       <p style="font-size: 13px; color: var(--text-muted);">
-        Universele onderhoudsapp v0.6 – Met gedeelde locaties via Firebase.
+        Universele onderhoudsapp v0.7 – Met Google Search-grounded AI voor onderbouwde onderhoudsadviezen.
       </p>
       <p style="font-size: 12px; color: var(--text-muted);">
         ${locations.length} locaties (${locations.filter(l=>l.shareCode).length} gedeeld) • ${items.length} onderdelen • ${klussen.length} klussen • ${storingen.length} storingen
@@ -1810,12 +1832,15 @@ function onFabClick() {
     view = { screen: 'location-form', locationId: null, locationTab: 'onderdelen', editItemId: null, editLocationId: null, editKlusId: null, editStoringId: null };
   } else if (view.screen === 'storingen') {
     currentPhoto = null;
+    window._currentSources = null;
     view = { screen: 'storing-form', locationId: null, locationTab: 'onderdelen', editItemId: null, editLocationId: null, editKlusId: null, editStoringId: null };
   } else if (view.screen === 'location-detail') {
     if (locations.length === 0) { alert('Maak eerst een locatie aan.'); return; }
     if (view.locationTab === 'klussen') {
       view = { ...view, screen: 'klus-form', editKlusId: null };
     } else {
+      currentPhoto = null;
+      window._currentSources = null;
       view = { ...view, screen: 'item-form', editItemId: null };
     }
   }
@@ -2024,7 +2049,8 @@ async function saveItem() {
     notes: document.getElementById('item-notes').value.trim(),
     nextDate: document.getElementById('item-next').value,
     remindDays: parseInt(document.getElementById('item-remind').value) || 14,
-    photo: photoToSave
+    photo: photoToSave,
+    sources: window._currentSources || null
   };
 
   // Bewaar oude staat voor rollback bij opslagfout
@@ -2186,29 +2212,59 @@ async function analyzeImageGemini() {
     const country = locations.find(l => l.id === view.locationId)?.country || 'NL';
     const normLabel = { NL: 'Nederlandse NEN/NTA', BE: 'Belgische NBN', DE: 'Duitse DIN', EU: 'Europese EN/ISO' }[country] || 'Nederlandse NEN';
 
-    const prompt = `Je analyseert een foto van iets dat onderhoud kan vereisen. Dit kan van alles zijn: technische installaties (sprinklerkop, brandblusser, CV-ketel, ventilatie, rookmelder), tuingereedschap of tuinplanten (heggenschaar, grasmaaier, struik, boom, haag), gebouwonderdelen (radiator, kozijn, dakgoot), of huishoudelijke apparaten.
+    // === STAP 1: Beeldherkenning + Google Search voor onderhoudsadvies ===
+    if (loadingDiv) loadingDiv.textContent = '✨ AI bekijkt de foto en zoekt onderhoudsadvies...';
 
-Geef ALLEEN een JSON-object terug met deze velden:
-- naam (string): korte Nederlandse beschrijving van wat je ziet
-- fabrikant (string): fabrikant indien zichtbaar, anders ""
-- type (string): model/type indien zichtbaar, anders ""
-- frequentieDagen (number): kies één van 30, 90, 180, 365, 730, of 1825
-- norm (string): relevante ${normLabel}-norm indien van toepassing, anders ""
-- toelichting (string): één zin over wat het is en welk onderhoud nodig is
+    const stap1Prompt = `Je analyseert een foto van iets dat onderhoud kan vereisen. Dit kan van alles zijn: technische installaties (sprinklerkop, brandblusser, CV-ketel, ventilatie, rookmelder), tuingereedschap of tuinplanten (heggenschaar, grasmaaier, struik, boom, haag), gebouwonderdelen (radiator, kozijn, dakgoot), of huishoudelijke apparaten.
 
-Voor tuinplanten/struiken: gebruik frequentie 180 (halfjaarlijks snoeien) of 365 (jaarlijks). Voor technische installaties meestal 365. Voor brandbeveiliging 365 (jaarlijkse keuring).`;
+Gebruik Google Search om actuele en betrouwbare informatie te vinden over het onderhoud van dit specifieke type onderdeel volgens ${normLabel} normen, technische bulletins, of erkende vakliteratuur (bij planten/tuin: tuinexpertbronnen).
 
-    const text = await callGemini([
-      { text: prompt },
+Geef in het Nederlands antwoord met:
+1. Wat zie je op de foto? (naam, eventueel fabrikant/type)
+2. Wat is de aanbevolen onderhoudsfrequentie (in dagen of een gangbare term zoals 'jaarlijks')?
+3. Welke specifieke NEN/NEN-EN/DIN-norm of technisch bulletin is van toepassing, OF welke bron geeft dit advies (bv. "Velt", "Vereniging Hoveniers Nederland", fabrikant X)?
+4. Korte toelichting (1-2 zinnen) over wat het onderhoud inhoudt en wanneer het beste uitgevoerd wordt.
+
+Wees concreet en specifiek over de bron — als je het niet zeker weet, zeg dat dan ook eerlijk.`;
+
+    const stap1Result = await callGemini([
+      { text: stap1Prompt },
       { inline_data: { mime_type: 'image/jpeg', data: dataUrlToBase64(currentPhoto) } }
-    ], { jsonMode: true, maxTokens: 1024, thinkingBudget: 256 });
+    ], { useSearch: true, maxTokens: 1024, thinkingBudget: 256, returnMetadata: true });
 
-    const result = extractJSON(text);
+    const advisoryText = stap1Result.text;
+    const groundingMeta = stap1Result.groundingMetadata;
+
+    // === STAP 2: Zet advies om naar gestructureerde JSON ===
+    if (loadingDiv) loadingDiv.textContent = '✨ Velden invullen...';
+
+    const stap2Prompt = `Hier is een tekstuele beschrijving van een onderdeel met onderhoudsadvies:
+
+---
+${advisoryText}
+---
+
+Zet dit om naar een JSON-object met EXACT deze velden:
+- naam (string): korte Nederlandse beschrijving van het onderdeel
+- fabrikant (string): fabrikant indien genoemd, anders ""
+- type (string): type/model indien genoemd, anders ""
+- frequentieDagen (number): kies één van 30, 90, 180, 365, 730, of 1825 (kies wat het dichtst bij het advies komt)
+- norm (string): de genoemde norm/bron zo letterlijk mogelijk (bv. "NEN-EN 12845", "Velt-advies snoeien", "Fabrikantenhandleiding")
+- toelichting (string): één zin met de kern van het advies, inclusief wanneer/hoe vaak
+
+Antwoord ALLEEN met het JSON-object, geen extra tekst.`;
+
+    const jsonText = await callGemini(
+      [{ text: stap2Prompt }],
+      { jsonMode: true, maxTokens: 512, thinkingBudget: 64 }
+    );
+
+    const result = extractJSON(jsonText);
     if (!result) {
-      throw new Error('Geen geldig JSON ontvangen. Antwoord van AI:\n\n' + text.substring(0, 300));
+      throw new Error('Geen geldig JSON ontvangen. Antwoord:\n\n' + jsonText.substring(0, 300));
     }
 
-    // Vul velden
+    // Vul velden in
     const nameEl = document.getElementById('item-name');
     const manufEl = document.getElementById('item-manufacturer');
     const typeEl = document.getElementById('item-type');
@@ -2221,7 +2277,6 @@ Voor tuinplanten/struiken: gebruik frequentie 180 (halfjaarlijks snoeien) of 365
     if (result.type && !typeEl.value) typeEl.value = result.type;
     if (result.norm && !normEl.value) normEl.value = result.norm;
     if (result.frequentieDagen) {
-      // Snap naar dichtstbijzijnde geldige optie
       const valid = [30, 90, 180, 365, 730, 1825];
       const closest = valid.reduce((p, c) =>
         Math.abs(c - result.frequentieDagen) < Math.abs(p - result.frequentieDagen) ? c : p
@@ -2234,15 +2289,67 @@ Voor tuinplanten/struiken: gebruik frequentie 180 (halfjaarlijks snoeien) of 365
       }
     }
 
-    document.getElementById('ai-suggestion-text').textContent = result.toelichting || `Herkend als: ${result.naam || 'onbekend'}`;
-    document.getElementById('ai-result').classList.remove('hidden');
+    // Bewaar de bronnen lokaal op het formulier zodat ze met opslaan meegaan
+    window._currentSources = extractSources(groundingMeta, advisoryText);
+
+    // Toon de bronvermelding
+    showAiResult(result.toelichting || `Herkend als: ${result.naam || 'onbekend'}`, window._currentSources);
 
   } catch (err) {
     console.error('AI-herkenning fout:', err);
     alert('AI-herkenning mislukt: ' + err.message + '\n\nVul de velden handmatig in.');
   } finally {
-    loadingDiv?.classList.add('hidden');
+    if (loadingDiv) {
+      loadingDiv.textContent = '✨ AI analyseert foto...';
+      loadingDiv.classList.add('hidden');
+    }
   }
+}
+
+// Haal de bronnen op uit Gemini's grounding metadata
+function extractSources(groundingMetadata, fallbackText) {
+  const sources = [];
+  if (groundingMetadata?.groundingChunks) {
+    groundingMetadata.groundingChunks.forEach(chunk => {
+      if (chunk.web?.uri) {
+        sources.push({
+          title: chunk.web.title || chunk.web.uri,
+          uri: chunk.web.uri
+        });
+      }
+    });
+  }
+  // Ook search-queries als referentie
+  if (groundingMetadata?.webSearchQueries) {
+    sources.push({
+      queries: groundingMetadata.webSearchQueries
+    });
+  }
+  return sources;
+}
+
+function showAiResult(toelichting, sources) {
+  const div = document.getElementById('ai-result');
+  if (!div) return;
+  let sourcesHtml = '';
+  const webSources = (sources || []).filter(s => s.uri);
+  const queries = (sources || []).find(s => s.queries)?.queries || [];
+
+  if (webSources.length > 0) {
+    sourcesHtml = `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,0,0,0.1);">
+      <div style="font-size:11px;font-weight:600;margin-bottom:4px;">🔗 Bronnen:</div>
+      ${webSources.slice(0, 5).map(s =>
+        `<div style="font-size:11px;margin-bottom:2px;"><a href="${escapeHtml(s.uri)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;">${escapeHtml(s.title)}</a></div>`
+      ).join('')}
+    </div>`;
+  } else if (queries.length > 0) {
+    sourcesHtml = `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(0,0,0,0.1);font-size:11px;">
+      🔍 Zoekopdrachten gebruikt: <em>${queries.map(escapeHtml).join(', ')}</em>
+    </div>`;
+  }
+
+  div.innerHTML = `<strong>AI-voorstel:</strong> ${escapeHtml(toelichting)}${sourcesHtml}`;
+  div.classList.remove('hidden');
 }
 
 function simulateAI() {
@@ -2255,8 +2362,7 @@ function simulateAI() {
     { name: 'Ventilatie-unit (WTW)', manuf: 'Itho Daalderop', type: 'HRU ECO', freq: '180', norm: 'NEN 1087' },
   ];
   const pick = suggestions[Math.floor(Math.random() * suggestions.length)];
-  document.getElementById('ai-suggestion-text').textContent = `Voorbeeld (geen AI actief): "${pick.name}". Zet AI aan in Instellingen voor echte herkenning.`;
-  document.getElementById('ai-result').classList.remove('hidden');
+  showAiResult(`Voorbeeld (geen AI actief): "${pick.name}". Zet AI aan in Instellingen voor echte herkenning.`, null);
   if (!document.getElementById('item-name').value) document.getElementById('item-name').value = pick.name;
   if (!document.getElementById('item-manufacturer').value) document.getElementById('item-manufacturer').value = pick.manuf;
   if (!document.getElementById('item-type').value) document.getElementById('item-type').value = pick.type;
