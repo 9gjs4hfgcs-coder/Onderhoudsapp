@@ -180,6 +180,7 @@
   .btn-secondary { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
   .btn-danger { background: var(--danger-light); color: var(--danger); }
   .btn-small { padding: 6px 10px; font-size: 12px; }
+  .btn:disabled { opacity: 0.5; cursor: wait; }
 
   .camera-box {
     background: #1e293b;
@@ -203,6 +204,17 @@
     padding: 20px;
   }
   .camera-placeholder svg { width: 48px; height: 48px; opacity: 0.6; }
+  .camera-loading {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 14px;
+    font-weight: 500;
+  }
 
   .ai-result {
     background: var(--success-light);
@@ -213,280 +225,181 @@
     font-size: 13px;
   }
   .ai-result strong { color: var(--success); }
+  .ai-result.purple {
+    background: var(--purple-light);
+    border-left-color: var(--purple);
+  }
+  .ai-result.purple strong { color: var(--purple); }
 
-  .loc-card {
+  .loc-card, .item-card, .klus-card {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 14px;
+    padding: 12px;
     margin-bottom: 10px;
     cursor: pointer;
     display: flex;
     align-items: center;
     gap: 12px;
   }
-  .loc-card:active { background: var(--bg); }
+  .loc-card { padding: 14px; }
+  .loc-card:active, .item-card:active, .klus-card:active { background: var(--bg); }
   .loc-icon {
-    width: 44px;
-    height: 44px;
-    background: var(--primary-light);
-    color: var(--primary);
+    width: 44px; height: 44px;
+    background: var(--primary-light); color: var(--primary);
     border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 22px;
-    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; flex-shrink: 0;
   }
-  .loc-body { flex: 1; min-width: 0; }
+  .loc-body, .item-body { flex: 1; min-width: 0; }
   .loc-name { font-weight: 600; font-size: 15px; margin-bottom: 2px; }
   .loc-meta { font-size: 12px; color: var(--text-muted); }
   .loc-stats {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 4px;
+    display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
   }
   .loc-stat {
-    background: var(--bg);
-    color: var(--text-muted);
-    padding: 2px 8px;
-    border-radius: 10px;
-    font-size: 11px;
-    font-weight: 600;
-    white-space: nowrap;
+    background: var(--bg); color: var(--text-muted);
+    padding: 2px 8px; border-radius: 10px;
+    font-size: 11px; font-weight: 600; white-space: nowrap;
   }
   .loc-stat.warning { background: var(--warning-light); color: var(--warning); }
   .loc-stat.danger { background: var(--danger-light); color: var(--danger); }
   .loc-stat.purple { background: var(--purple-light); color: var(--purple); }
 
-  .item-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 12px;
-    margin-bottom: 10px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    cursor: pointer;
-  }
-  .item-card:active { background: var(--bg); }
   .item-icon {
-    width: 50px;
-    height: 50px;
-    background: var(--primary-light);
-    color: var(--primary);
+    width: 50px; height: 50px;
+    background: var(--primary-light); color: var(--primary);
     border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    font-size: 20px;
-    overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; font-size: 20px; overflow: hidden;
   }
   .item-icon img { width: 100%; height: 100%; object-fit: cover; }
-  .item-body { flex: 1; min-width: 0; }
   .item-name { font-weight: 600; font-size: 14px; margin-bottom: 2px; }
   .item-meta { font-size: 12px; color: var(--text-muted); }
   .item-due {
-    font-size: 11px;
-    padding: 4px 8px;
-    border-radius: 6px;
-    font-weight: 600;
-    white-space: nowrap;
+    font-size: 11px; padding: 4px 8px; border-radius: 6px;
+    font-weight: 600; white-space: nowrap;
   }
   .due-soon { background: var(--warning-light); color: var(--warning); }
   .due-overdue { background: var(--danger-light); color: var(--danger); }
   .due-ok { background: var(--success-light); color: var(--success); }
 
-  .klus-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 12px;
-    margin-bottom: 10px;
-    cursor: pointer;
-  }
-  .klus-card:active { background: var(--bg); }
+  .klus-card { flex-direction: column; align-items: stretch; padding: 12px; }
   .klus-row1 { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
   .klus-name { font-weight: 600; font-size: 14px; flex: 1; }
   .klus-row2 { font-size: 12px; color: var(--text-muted); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 
   .status-tag, .prio-tag {
-    font-size: 11px;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-weight: 600;
+    font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 600;
   }
   .status-open { background: var(--bg); color: var(--text-muted); }
   .status-bezig { background: var(--warning-light); color: var(--warning); }
   .status-klaar { background: var(--success-light); color: var(--success); }
   .prio-hoog { background: var(--danger-light); color: var(--danger); }
-  .prio-normaal { background: var(--bg); color: var(--text-muted); }
-  .prio-laag { background: var(--bg); color: var(--text-muted); }
 
   .empty {
-    text-align: center;
-    padding: 40px 20px;
-    color: var(--text-muted);
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
   }
 
   .hidden { display: none !important; }
 
   .email-tag {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    background: var(--primary-light);
-    color: var(--primary);
-    padding: 4px 8px;
-    border-radius: 6px;
-    font-size: 12px;
-    margin: 2px;
+    display: inline-flex; align-items: center; gap: 4px;
+    background: var(--primary-light); color: var(--primary);
+    padding: 4px 8px; border-radius: 6px;
+    font-size: 12px; margin: 2px;
   }
   .email-tag button {
-    background: none;
-    border: none;
-    color: var(--primary);
-    cursor: pointer;
-    padding: 0;
-    font-size: 14px;
+    background: none; border: none; color: var(--primary);
+    cursor: pointer; padding: 0; font-size: 14px;
   }
 
   .fab {
     position: fixed;
-    bottom: 20px;
-    right: 20px;
-    background: var(--primary);
-    color: white;
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    border: none;
-    font-size: 28px;
-    cursor: pointer;
+    bottom: 20px; right: 20px;
+    background: var(--primary); color: white;
+    width: 56px; height: 56px;
+    border-radius: 50%; border: none;
+    font-size: 28px; cursor: pointer;
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     z-index: 50;
   }
 
   .screen-title {
-    font-size: 18px;
-    font-weight: 600;
-    margin: 0 0 14px;
+    font-size: 18px; font-weight: 600; margin: 0 0 14px;
   }
   .ctx-tag {
     display: inline-block;
-    font-size: 11px;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-weight: 600;
+    font-size: 11px; padding: 2px 8px;
+    border-radius: 4px; font-weight: 600;
     margin-left: 6px;
   }
   .ctx-zakelijk { background: var(--primary-light); color: var(--primary); }
   .ctx-prive { background: #fef3c7; color: #92400e; }
 
-  .row-actions {
-    display: flex;
-    gap: 8px;
-    margin-top: 12px;
-  }
+  .row-actions { display: flex; gap: 8px; margin-top: 12px; }
   .row-actions .btn { flex: 1; }
 
-  /* Tools/Bestel rij */
   .tool-row, .order-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 8px;
-    padding: 8px;
-    background: var(--bg);
-    border-radius: 8px;
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 8px; padding: 8px;
+    background: var(--bg); border-radius: 8px;
   }
   .tool-row .check {
-    width: 22px;
-    height: 22px;
-    border: 2px solid var(--border);
-    border-radius: 4px;
-    background: white;
-    cursor: pointer;
+    width: 22px; height: 22px;
+    border: 2px solid var(--border); border-radius: 4px;
+    background: white; cursor: pointer;
     flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-    color: var(--success);
-    font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; color: var(--success); font-weight: 700;
   }
   .tool-row .check.checked { background: var(--success-light); border-color: var(--success); }
   .tool-row input { flex: 1; background: white; }
-  .tool-row .del { background: none; border: none; color: var(--text-muted); font-size: 18px; cursor: pointer; padding: 4px 6px; }
+  .tool-row .del, .order-row .del {
+    background: none; border: none; color: var(--text-muted);
+    font-size: 18px; cursor: pointer; padding: 4px 6px;
+  }
 
   .order-row { flex-wrap: wrap; gap: 6px; }
-  .order-row .order-line1 { display: flex; gap: 6px; width: 100%; align-items: center; }
-  .order-row .order-line2 { display: flex; gap: 6px; width: 100%; align-items: center; }
+  .order-row .order-line1, .order-row .order-line2 {
+    display: flex; gap: 6px; width: 100%; align-items: center;
+  }
   .order-row input.name-input { flex: 2; background: white; }
   .order-row input.qty-input { width: 60px; background: white; text-align: center; }
   .order-row input.price-input { width: 90px; background: white; text-align: right; }
   .order-row select.sup-select { flex: 1; background: white; min-width: 0; }
   .order-row .search-btn {
-    background: var(--primary-light);
-    color: var(--primary);
-    border: none;
-    padding: 8px 10px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: 600;
+    background: var(--primary-light); color: var(--primary);
+    border: none; padding: 8px 10px; border-radius: 6px;
+    cursor: pointer; font-size: 12px; font-weight: 600;
     white-space: nowrap;
   }
   .order-row .ai-btn {
-    background: var(--purple-light);
-    color: var(--purple);
-    border: none;
-    padding: 8px 10px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: 600;
+    background: var(--purple-light); color: var(--purple);
+    border: none; padding: 8px 10px; border-radius: 6px;
+    cursor: pointer; font-size: 12px; font-weight: 600;
     white-space: nowrap;
   }
-  .order-row .del { background: none; border: none; color: var(--text-muted); font-size: 18px; cursor: pointer; padding: 4px 6px; }
 
   .total-box {
-    background: var(--primary-light);
-    border-radius: 8px;
+    background: var(--primary-light); border-radius: 8px;
     padding: 12px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    display: flex; justify-content: space-between; align-items: center;
     margin-top: 10px;
   }
   .total-label { font-size: 13px; color: var(--primary); }
   .total-amount { font-size: 18px; font-weight: 700; color: var(--primary); }
 
-  .info-banner {
-    background: var(--primary-light);
-    color: var(--primary);
-    padding: 10px 12px;
-    border-radius: 8px;
-    font-size: 12px;
-    margin-bottom: 12px;
-    display: flex;
-    gap: 8px;
-    align-items: flex-start;
+  .info-banner, .warn-banner, .success-banner {
+    padding: 10px 12px; border-radius: 8px;
+    font-size: 12px; margin-bottom: 12px;
+    display: flex; gap: 8px; align-items: flex-start;
   }
-  .warn-banner {
-    background: var(--warning-light);
-    color: var(--warning);
-    padding: 10px 12px;
-    border-radius: 8px;
-    font-size: 12px;
-    margin-bottom: 12px;
-    display: flex;
-    gap: 8px;
-    align-items: flex-start;
-  }
+  .info-banner { background: var(--primary-light); color: var(--primary); }
+  .warn-banner { background: var(--warning-light); color: var(--warning); }
+  .success-banner { background: var(--success-light); color: var(--success); }
+
+  a { color: var(--primary); }
 </style>
 </head>
 <body>
@@ -507,10 +420,15 @@ let items = JSON.parse(localStorage.getItem('items') || '[]');
 let klussen = JSON.parse(localStorage.getItem('klussen') || '[]');
 let emails = JSON.parse(localStorage.getItem('emails') || '[]');
 let settings = JSON.parse(localStorage.getItem('settings') || '{}');
-if (!settings.apiKey) settings.apiKey = '';
-if (!settings.aiEnabled) settings.aiEnabled = false;
 
-// Suppliers + search URL templates
+// Migrate old settings field name
+if (settings.apiKey && !settings.geminiKey) settings.geminiKey = settings.apiKey;
+if (!settings.geminiKey) settings.geminiKey = '';
+if (settings.aiEnabled === undefined) settings.aiEnabled = false;
+
+const GEMINI_MODEL = 'gemini-2.5-flash';
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+
 const SUPPLIERS = {
   'gamma':     { name: 'Gamma',     url: q => `https://www.gamma.nl/assortiment/zoeken?text=${encodeURIComponent(q)}` },
   'praxis':    { name: 'Praxis',    url: q => `https://www.praxis.nl/zoeken?searchTerm=${encodeURIComponent(q)}` },
@@ -524,6 +442,35 @@ const SUPPLIERS = {
 let view = { screen: 'locations', locationId: null, locationTab: 'onderdelen', editItemId: null, editLocationId: null, editKlusId: null };
 let currentPhoto = null;
 let stream = null;
+let currentKlus = null;
+
+// ============ GEMINI HELPERS ============
+async function callGemini(parts) {
+  if (!settings.geminiKey) throw new Error('Geen Gemini API-key ingesteld. Ga naar Instellingen.');
+  const res = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(settings.geminiKey)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts }],
+      generationConfig: { temperature: 0.2, maxOutputTokens: 500 }
+    })
+  });
+  if (!res.ok) {
+    let errMsg = `API fout (${res.status})`;
+    try {
+      const err = await res.json();
+      errMsg += ': ' + (err.error?.message || JSON.stringify(err)).substring(0, 200);
+    } catch {}
+    throw new Error(errMsg);
+  }
+  const data = await res.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+}
+
+function dataUrlToBase64(dataUrl) {
+  const idx = dataUrl.indexOf(',');
+  return idx >= 0 ? dataUrl.substring(idx + 1) : dataUrl;
+}
 
 // ============ RENDER ============
 function render() {
@@ -689,7 +636,6 @@ function renderKlussenTab(loc) {
       </div>`;
     return;
   }
-  // Sort: open eerst, dan bezig, dan klaar; binnen status op deadline
   const order = { 'open': 0, 'bezig': 1, 'klaar': 2 };
   const sorted = [...locKlussen].sort((a,b) => {
     const so = (order[a.status] || 0) - (order[b.status] || 0);
@@ -776,6 +722,8 @@ function renderItemForm(main) {
     `<option value="${l.id}" ${(item?.locationId || view.locationId) === l.id ? 'selected' : ''}>${escapeHtml(l.name)}</option>`
   ).join('');
 
+  const aiAvailable = settings.aiEnabled && settings.geminiKey;
+
   main.innerHTML = `
     <div class="card">
       <p class="card-title"><span class="step">1</span> Locatie</p>
@@ -790,7 +738,8 @@ function renderItemForm(main) {
     </div>
 
     <div class="card">
-      <p class="card-title"><span class="step">2</span> Scan onderdeel</p>
+      <p class="card-title"><span class="step">2</span> Scan onderdeel ${aiAvailable ? '<span style="font-size:11px;background:var(--purple-light);color:var(--purple);padding:2px 6px;border-radius:4px;margin-left:4px;">✨ AI aan</span>' : ''}</p>
+      ${!aiAvailable ? '<div class="info-banner" style="margin-bottom:10px;"><span>ℹ️</span><div>Zet AI aan in Instellingen voor echte beeldherkenning. Zonder AI vult de scan een voorbeeld in.</div></div>' : ''}
       <div class="camera-box" id="camera-box">
         <div class="camera-placeholder ${currentPhoto ? 'hidden' : ''}" id="camera-placeholder">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
@@ -798,6 +747,7 @@ function renderItemForm(main) {
         </div>
         <video id="camera-video" autoplay playsinline class="hidden"></video>
         <img id="captured-img" class="${currentPhoto ? '' : 'hidden'}" alt="" ${currentPhoto ? `src="${currentPhoto}"` : ''} />
+        <div class="camera-loading hidden" id="camera-loading">✨ AI analyseert foto...</div>
       </div>
       <div class="row">
         <button class="btn btn-secondary" onclick="startCamera()">📷 Camera</button>
@@ -809,7 +759,7 @@ function renderItemForm(main) {
 
     <div class="card">
       <p class="card-title"><span class="step">3</span> Details</p>
-      <div class="ai-result hidden" id="ai-result">
+      <div class="ai-result hidden purple" id="ai-result">
         <strong>AI-voorstel:</strong> <span id="ai-suggestion-text"></span>
       </div>
       <div class="field">
@@ -879,9 +829,6 @@ function renderItemForm(main) {
   `;
 }
 
-// ============ KLUS FORM ============
-let currentKlus = null;
-
 function renderKlusForm(main) {
   const isEdit = !!view.editKlusId;
   currentKlus = isEdit
@@ -946,7 +893,7 @@ function renderKlusForm(main) {
 
     <div class="card">
       <p class="card-title"><span class="step">3</span> 🛒 Bestellijst</p>
-      <p style="font-size:12px;color:var(--text-muted);margin:0 0 10px;">Wat moet je kopen? Kies leverancier en zoek de prijs op via 🔍 (of laat AI een schatting maken via ✨).</p>
+      <p style="font-size:12px;color:var(--text-muted);margin:0 0 10px;">Wat moet je kopen? Kies leverancier en zoek de prijs op via 🔍 ${settings.aiEnabled && settings.geminiKey ? 'of laat AI een schatting maken via ✨' : ''}.</p>
       <div id="order-list"></div>
       <button class="btn btn-secondary btn-small" style="margin-top:6px;" onclick="addOrder()">+ Artikel toevoegen</button>
       <div class="total-box">
@@ -1007,9 +954,7 @@ function renderOrders() {
     return;
   }
 
-  const supOptions = Object.entries(SUPPLIERS).map(([k,v]) =>
-    `<option value="${k}">${v.name}</option>`
-  ).join('');
+  const aiOn = settings.aiEnabled && settings.geminiKey;
 
   div.innerHTML = currentKlus.bestellijst.map((o, i) => `
     <div class="order-row">
@@ -1026,7 +971,7 @@ function renderOrders() {
       </div>
       <div class="order-line2">
         <button class="search-btn" onclick="searchSupplier(${i})">🔍 Zoek bij leverancier</button>
-        ${settings.aiEnabled && settings.apiKey ? `<button class="ai-btn" onclick="estimatePriceAI(${i})">✨ AI-schatting</button>` : ''}
+        ${aiOn ? `<button class="ai-btn" onclick="estimatePriceAI(${i}, this)">✨ AI-schatting</button>` : ''}
       </div>
     </div>
   `).join('');
@@ -1038,7 +983,7 @@ function addOrder() {
   renderOrders();
 }
 function updateOrder(i, key, val) {
-  currentKlus.bestellijst[i][key] = (key === 'aantal' || key === 'prijs') ? val : val;
+  currentKlus.bestellijst[i][key] = val;
   if (key === 'prijs' || key === 'aantal') updateTotal();
 }
 function removeOrder(i) { currentKlus.bestellijst.splice(i, 1); renderOrders(); }
@@ -1050,50 +995,25 @@ function searchSupplier(i) {
   window.open(sup.url(o.naam), '_blank');
 }
 
-async function estimatePriceAI(i) {
+async function estimatePriceAI(i, btn) {
   const o = currentKlus.bestellijst[i];
   if (!o.naam) { alert('Vul eerst de naam van het artikel in.'); return; }
-  if (!settings.apiKey) { alert('Geen API-key ingesteld. Ga naar Instellingen.'); return; }
 
   const sup = SUPPLIERS[o.leverancier || 'gamma']?.name || 'leverancier';
-  const btn = event.target;
   const oldText = btn.textContent;
-  btn.textContent = '... laden';
+  btn.textContent = '...';
   btn.disabled = true;
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': settings.apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 200,
-        messages: [{
-          role: 'user',
-          content: `Geef alleen een redelijke gemiddelde Nederlandse winkelprijs (in euro, alleen het getal met max 2 decimalen, bv "24.95") voor: "${o.naam}" bij ${sup}. Als je het niet zeker weet, geef een redelijke schatting. Antwoord alleen met het getal, geen tekst eromheen.`
-        }]
-      })
-    });
-
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`API fout (${res.status}): ${err.substring(0,200)}`);
-    }
-
-    const data = await res.json();
-    const text = data.content?.[0]?.text || '';
+    const prompt = `Geef alleen een redelijke gemiddelde Nederlandse winkelprijs (in euro, alleen het getal met max 2 decimalen, bijvoorbeeld "24.95") voor: "${o.naam}" bij leverancier "${sup}". Als je het niet zeker weet, geef een redelijke schatting. Antwoord alleen met het getal, geen tekst, geen euro-teken, geen uitleg.`;
+    const text = await callGemini([{ text: prompt }]);
     const match = text.match(/(\d+[.,]?\d*)/);
     if (match) {
       const price = parseFloat(match[1].replace(',', '.'));
       currentKlus.bestellijst[i].prijs = price.toFixed(2);
       renderOrders();
     } else {
-      alert('Geen geldige prijs terug van AI: ' + text);
+      alert('Geen geldige prijs ontvangen. Antwoord: ' + text);
     }
   } catch (err) {
     alert('AI-schatting mislukt: ' + err.message);
@@ -1122,8 +1042,6 @@ function saveKlus() {
   const itemSel = document.getElementById('klus-item').value;
   currentKlus.itemId = itemSel ? parseInt(itemSel) : null;
   currentKlus.werkelijkeKosten = document.getElementById('klus-werkelijk').value;
-
-  // Filter lege rijen
   currentKlus.gereedschappen = currentKlus.gereedschappen.filter(t => t.name.trim() !== '');
   currentKlus.bestellijst = currentKlus.bestellijst.filter(o => (o.naam || '').trim() !== '');
 
@@ -1172,24 +1090,36 @@ function renderSettings(main) {
     </div>
 
     <div class="card">
-      <p class="card-title">✨ AI-prijsschatting</p>
-      <p style="font-size: 13px; color: var(--text-muted); margin-top: 0;">Laat AI een redelijke prijs schatten voor artikelen in je bestellijst. Vereist een API-key van <a href="https://console.anthropic.com" target="_blank" style="color:var(--primary);">console.anthropic.com</a>. Je krijgt $5 gratis tegoed bij aanmaak van een account.</p>
-      <div class="warn-banner">
-        <span>⚠️</span>
-        <div>Let op: een API-key in een browserapp kan zichtbaar zijn voor anderen. Gebruik dit alleen voor persoonlijk gebruik en stel een uitgavelimiet in op je Anthropic-account.</div>
+      <p class="card-title">✨ AI-functies (Google Gemini)</p>
+      <p style="font-size: 13px; color: var(--text-muted); margin-top: 0;">Met AI kun je foto's automatisch laten herkennen en prijzen laten schatten. Gebruikt het gratis Gemini-tier van Google (geen creditcard nodig).</p>
+
+      <div class="success-banner">
+        <span>✓</span>
+        <div><strong>Gratis API-key in 3 stappen:</strong><br>
+        1. Ga naar <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a><br>
+        2. Log in met je Google-account<br>
+        3. Klik "Create API key" → kopieer 'm naar het veld hieronder
+        </div>
       </div>
+
+      <div class="info-banner">
+        <span>ℹ️</span>
+        <div>Gratis tier: 10 verzoeken per minuut, 250 per dag. Ruim voldoende voor gewoon gebruik. Let op: Google kan je input gebruiken om hun AI te trainen, gebruik dus geen gevoelige bedrijfsinformatie.</div>
+      </div>
+
       <div class="field">
-        <label>Anthropic API-key</label>
-        <input type="password" id="api-key" placeholder="sk-ant-..." value="${escapeHtml(settings.apiKey)}" />
+        <label>Gemini API-key</label>
+        <input type="password" id="api-key" placeholder="AIza..." value="${escapeHtml(settings.geminiKey)}" />
       </div>
       <div class="field">
         <label>AI-functies aanzetten</label>
-        <div class="toggle-group">
-          <button type="button" class="toggle-btn ${!settings.aiEnabled ? 'active' : ''}" onclick="setAiEnabled(false)">Uit</button>
-          <button type="button" class="toggle-btn ${settings.aiEnabled ? 'active' : ''}" onclick="setAiEnabled(true)">Aan</button>
+        <div class="toggle-group" id="ai-toggle">
+          <button type="button" class="toggle-btn ${!settings.aiEnabled ? 'active' : ''}" onclick="setAiEnabled(false, this)">Uit</button>
+          <button type="button" class="toggle-btn ${settings.aiEnabled ? 'active' : ''}" onclick="setAiEnabled(true, this)">Aan</button>
         </div>
       </div>
       <button class="btn btn-primary" onclick="saveSettings()">Opslaan</button>
+      ${settings.geminiKey ? `<button class="btn btn-secondary" style="width:100%;margin-top:8px;" onclick="testGemini(this)">🧪 Test verbinding</button>` : ''}
     </div>
 
     <div class="card">
@@ -1219,7 +1149,7 @@ function renderSettings(main) {
     <div class="card">
       <p class="card-title">ℹ️ Over</p>
       <p style="font-size: 13px; color: var(--text-muted);">
-        Universele onderhoudsapp v0.3 – Met klussenlijst en bestellijst.
+        Universele onderhoudsapp v0.4 – Met Gemini AI voor beeldherkenning en prijsschatting.
       </p>
       <p style="font-size: 12px; color: var(--text-muted);">
         ${locations.length} locaties • ${items.length} onderdelen • ${klussen.length} klussen
@@ -1229,16 +1159,37 @@ function renderSettings(main) {
   renderEmails();
 }
 
-function setAiEnabled(val) {
+function setAiEnabled(val, btn) {
   settings.aiEnabled = val;
-  document.querySelectorAll('.toggle-group .toggle-btn').forEach(b => b.classList.remove('active'));
-  event.target.classList.add('active');
+  document.querySelectorAll('#ai-toggle .toggle-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
 }
 
 function saveSettings() {
-  settings.apiKey = document.getElementById('api-key').value.trim();
+  settings.geminiKey = document.getElementById('api-key').value.trim();
   localStorage.setItem('settings', JSON.stringify(settings));
   alert('Instellingen opgeslagen!');
+  render();
+}
+
+async function testGemini(btn) {
+  if (!settings.geminiKey) { alert('Eerst API-key invullen en opslaan.'); return; }
+  const oldText = btn.textContent;
+  btn.textContent = '... testen';
+  btn.disabled = true;
+  try {
+    const text = await callGemini([{ text: 'Antwoord met alleen het woord OK' }]);
+    if (text.toUpperCase().includes('OK')) {
+      alert('✓ Verbinding gelukt! Gemini reageert: "' + text.trim() + '"');
+    } else {
+      alert('Verbinding werkt, maar onverwacht antwoord: ' + text);
+    }
+  } catch (err) {
+    alert('❌ Test mislukt: ' + err.message);
+  } finally {
+    btn.textContent = oldText;
+    btn.disabled = false;
+  }
 }
 
 // ============ NAVIGATION ============
@@ -1423,7 +1374,7 @@ function capturePhoto() {
   currentPhoto = canvas.toDataURL('image/jpeg', 0.7);
   showCapturedPhoto();
   stopCamera();
-  simulateAI();
+  analyzeImage();
 }
 
 function handleFileUpload(e) {
@@ -1433,7 +1384,7 @@ function handleFileUpload(e) {
   reader.onload = (ev) => {
     currentPhoto = ev.target.result;
     showCapturedPhoto();
-    simulateAI();
+    analyzeImage();
   };
   reader.readAsDataURL(file);
 }
@@ -1451,6 +1402,84 @@ function stopCamera() {
   if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
 }
 
+async function analyzeImage() {
+  if (settings.aiEnabled && settings.geminiKey && currentPhoto) {
+    await analyzeImageGemini();
+  } else {
+    simulateAI();
+  }
+}
+
+async function analyzeImageGemini() {
+  const loadingDiv = document.getElementById('camera-loading');
+  loadingDiv?.classList.remove('hidden');
+
+  try {
+    const country = locations.find(l => l.id === view.locationId)?.country || 'NL';
+    const normLabel = { NL: 'Nederlandse NEN/NTA', BE: 'Belgische NBN', DE: 'Duitse DIN', EU: 'Europese EN/ISO' }[country] || '';
+
+    const prompt = `Je bekijkt een foto van een onderdeel dat onderhoud nodig heeft. Dit kan van alles zijn: een technische installatie (sprinklerkop, brandblusser, CV-ketel, ventilatie, rookmelder), tuingereedschap (heggenschaar, grasmaaier), gebouwonderdeel (cv-radiator, kozijn, dakgoot), of huishoudelijk apparaat.
+
+Geef het antwoord ALLEEN als geldig JSON, geen tekst eromheen, geen \`\`\`json blokken. Gebruik exact deze structuur:
+
+{
+  "naam": "korte beschrijving van het onderdeel in het Nederlands",
+  "fabrikant": "fabrikant als zichtbaar of waarschijnlijk, anders lege string",
+  "type": "model/type als zichtbaar of waarschijnlijk, anders lege string",
+  "frequentieDagen": 365,
+  "norm": "${normLabel ? `relevante ${normLabel}-norm als bekend (bijv. NEN-EN 12845, NEN 2559), anders lege string` : 'relevante norm als bekend, anders lege string'}",
+  "toelichting": "korte toelichting (1 zin) over wat het is en welk onderhoud nodig is"
+}
+
+Voor frequentieDagen kies één van: 30, 90, 180, 365, 730, 1825. Kies de meest gangbare onderhoudsfrequentie voor dit onderdeel volgens Nederlandse normen.`;
+
+    const text = await callGemini([
+      { text: prompt },
+      { inline_data: { mime_type: 'image/jpeg', data: dataUrlToBase64(currentPhoto) } }
+    ]);
+
+    // Parse JSON (verwijder eventuele markdown fences)
+    const cleaned = text.replace(/```json\s*|\s*```/g, '').trim();
+    let result;
+    try {
+      result = JSON.parse(cleaned);
+    } catch {
+      // Probeer JSON-object te extraheren
+      const m = cleaned.match(/\{[\s\S]*\}/);
+      if (m) result = JSON.parse(m[0]);
+      else throw new Error('Geen geldig JSON-antwoord ontvangen');
+    }
+
+    // Vul velden
+    const nameEl = document.getElementById('item-name');
+    const manufEl = document.getElementById('item-manufacturer');
+    const typeEl = document.getElementById('item-type');
+    const freqEl = document.getElementById('item-frequency');
+    const normEl = document.getElementById('item-norm');
+    const nextEl = document.getElementById('item-next');
+
+    if (result.naam && !nameEl.value) nameEl.value = result.naam;
+    if (result.fabrikant && !manufEl.value) manufEl.value = result.fabrikant;
+    if (result.type && !typeEl.value) typeEl.value = result.type;
+    if (result.norm && !normEl.value) normEl.value = result.norm;
+    if (result.frequentieDagen) freqEl.value = String(result.frequentieDagen);
+    if (!nextEl.value && result.frequentieDagen) {
+      const next = new Date();
+      next.setDate(next.getDate() + parseInt(result.frequentieDagen));
+      nextEl.value = next.toISOString().split('T')[0];
+    }
+
+    document.getElementById('ai-suggestion-text').textContent = result.toelichting || `Herkend als: ${result.naam}`;
+    document.getElementById('ai-result').classList.remove('hidden');
+
+  } catch (err) {
+    alert('AI-herkenning mislukt: ' + err.message + '\n\nVul de velden handmatig in.');
+    console.error(err);
+  } finally {
+    loadingDiv?.classList.add('hidden');
+  }
+}
+
 function simulateAI() {
   const suggestions = [
     { name: 'Sprinklerkop, glasbulb', manuf: 'Viking', type: 'VK102', freq: '365', norm: 'NEN-EN 12845' },
@@ -1461,7 +1490,7 @@ function simulateAI() {
     { name: 'Ventilatie-unit (WTW)', manuf: 'Itho Daalderop', type: 'HRU ECO', freq: '180', norm: 'NEN 1087' },
   ];
   const pick = suggestions[Math.floor(Math.random() * suggestions.length)];
-  document.getElementById('ai-suggestion-text').textContent = `Dit lijkt op een "${pick.name}". Velden alvast ingevuld – controleer en pas aan.`;
+  document.getElementById('ai-suggestion-text').textContent = `Voorbeeld (geen AI actief): "${pick.name}". Zet AI aan in Instellingen voor echte herkenning.`;
   document.getElementById('ai-result').classList.remove('hidden');
   if (!document.getElementById('item-name').value) document.getElementById('item-name').value = pick.name;
   if (!document.getElementById('item-manufacturer').value) document.getElementById('item-manufacturer').value = pick.manuf;
@@ -1543,8 +1572,11 @@ function clearAll() {
   if (!confirm('ALLE data wissen? Dit kan niet ongedaan worden.')) return;
   if (!confirm('Weet je het echt zeker?')) return;
   locations = []; items = []; klussen = []; emails = [];
+  // Bewaar API-key en AI-instelling
+  const keep = { geminiKey: settings.geminiKey, aiEnabled: settings.aiEnabled };
   localStorage.clear();
-  settings = { apiKey: '', aiEnabled: false };
+  settings = keep;
+  localStorage.setItem('settings', JSON.stringify(settings));
   goTo('locations');
 }
 
