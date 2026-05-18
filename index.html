@@ -274,6 +274,7 @@
     flex-shrink: 0; font-size: 20px; overflow: hidden;
   }
   .item-icon img { width: 100%; height: 100%; object-fit: cover; }
+  .item-icon.storing-icon { background: var(--warning-light); color: var(--warning); }
   .item-name { font-weight: 600; font-size: 14px; margin-bottom: 2px; }
   .item-meta { font-size: 12px; color: var(--text-muted); }
   .item-due {
@@ -418,6 +419,7 @@
 let locations = JSON.parse(localStorage.getItem('locations') || '[]');
 let items = JSON.parse(localStorage.getItem('items') || '[]');
 let klussen = JSON.parse(localStorage.getItem('klussen') || '[]');
+let storingen = JSON.parse(localStorage.getItem('storingen') || '[]');
 let emails = JSON.parse(localStorage.getItem('emails') || '[]');
 let settings = JSON.parse(localStorage.getItem('settings') || '{}');
 
@@ -439,7 +441,7 @@ const SUPPLIERS = {
   'overig':    { name: 'Overig',    url: q => `https://www.google.com/search?q=${encodeURIComponent(q + ' kopen')}&tbm=shop` }
 };
 
-let view = { screen: 'locations', locationId: null, locationTab: 'onderdelen', editItemId: null, editLocationId: null, editKlusId: null };
+let view = { screen: 'locations', locationId: null, locationTab: 'onderdelen', editItemId: null, editLocationId: null, editKlusId: null, editStoringId: null };
 let currentPhoto = null;
 let stream = null;
 let currentKlus = null;
@@ -449,14 +451,16 @@ async function callGemini(parts, options = {}) {
   if (!settings.geminiKey) throw new Error('Geen Gemini API-key ingesteld. Ga naar Instellingen.');
   const generationConfig = {
     temperature: 0.2,
-    maxOutputTokens: options.maxTokens || 2048,
-    // Gemini 2.5 Flash heeft "thinking tokens" die de outputlimiet opeten.
-    // Limit thinking om ruimte over te houden voor het echte antwoord.
-    thinkingConfig: { thinkingBudget: options.thinkingBudget ?? 256 }
+    maxOutputTokens: options.maxTokens || 1024,
+    thinkingConfig: { thinkingBudget: options.thinkingBudget ?? 128 }
   };
   if (options.jsonMode) {
     generationConfig.responseMimeType = 'application/json';
   }
+
+  // Tel het verzoek lokaal
+  trackAiUsage();
+
   const res = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(settings.geminiKey)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -467,10 +471,25 @@ async function callGemini(parts, options = {}) {
   });
   if (!res.ok) {
     let errMsg = `API fout (${res.status})`;
+    let rawErr = '';
     try {
       const err = await res.json();
-      errMsg += ': ' + (err.error?.message || JSON.stringify(err)).substring(0, 200);
+      rawErr = err.error?.message || JSON.stringify(err);
+      errMsg += ': ' + rawErr.substring(0, 200);
     } catch {}
+    // Specifieke uitleg voor quota-fout
+    if (res.status === 429) {
+      throw new Error(
+        '⏱ Gratis Gemini-quota bereikt.\n\n' +
+        'Limieten gratis tier:\n' +
+        '• 10 verzoeken per minuut\n' +
+        '• 250 verzoeken per dag\n\n' +
+        'Wacht 1-2 minuten en probeer opnieuw. Bij dagelijkse limiet: wacht tot ochtend (rond 9:00 NL).'
+      );
+    }
+    if (res.status === 400 && /api[_ ]key/i.test(rawErr)) {
+      throw new Error('🔑 Ongeldige API-key. Controleer hem in Instellingen.');
+    }
     throw new Error(errMsg);
   }
   const data = await res.json();
@@ -521,6 +540,25 @@ function dataUrlToBase64(dataUrl) {
   return idx >= 0 ? dataUrl.substring(idx + 1) : dataUrl;
 }
 
+// Telt AI-verzoeken per dag, lokaal opgeslagen
+function trackAiUsage() {
+  const today = new Date().toISOString().split('T')[0];
+  const usage = JSON.parse(localStorage.getItem('aiUsage') || '{}');
+  if (usage.date !== today) {
+    usage.date = today;
+    usage.count = 0;
+  }
+  usage.count = (usage.count || 0) + 1;
+  localStorage.setItem('aiUsage', JSON.stringify(usage));
+}
+
+function getAiUsage() {
+  const today = new Date().toISOString().split('T')[0];
+  const usage = JSON.parse(localStorage.getItem('aiUsage') || '{}');
+  if (usage.date !== today) return 0;
+  return usage.count || 0;
+}
+
 // ============ RENDER ============
 function render() {
   const main = document.getElementById('main');
@@ -531,6 +569,14 @@ function render() {
     headerTitle.innerHTML = '🔧 Locaties';
     fab.classList.remove('hidden');
     renderLocations(main);
+  } else if (view.screen === 'storingen') {
+    headerTitle.innerHTML = '⚠️ Storingen';
+    fab.classList.remove('hidden');
+    renderStoringen(main);
+  } else if (view.screen === 'storing-form') {
+    headerTitle.innerHTML = `<button class="back-btn" onclick="goTo('storingen')">←</button> ${view.editStoringId ? 'Storing bewerken' : 'Nieuwe storing'}`;
+    fab.classList.add('hidden');
+    renderStoringForm(main);
   } else if (view.screen === 'location-detail') {
     const loc = locations.find(l => l.id === view.locationId);
     headerTitle.innerHTML = `<button class="back-btn" onclick="goTo('locations')">←</button> ${escapeHtml(loc?.name || '')}`;
@@ -556,10 +602,12 @@ function render() {
 }
 
 function renderLocations(main) {
+  const openStoringen = storingen.filter(s => s.status !== 'opgelost').length;
   main.innerHTML = `
     <div class="tabs">
-      <button class="tab active" onclick="goTo('locations')">Locaties</button>
-      <button class="tab" onclick="goTo('settings')">Instellingen</button>
+      <button class="tab active" onclick="goTo('locations')">📍 Locaties</button>
+      <button class="tab" onclick="goTo('storingen')">⚠️ Storingen${openStoringen > 0 ? `<span class="badge">${openStoringen}</span>` : ''}</button>
+      <button class="tab" onclick="goTo('settings')">⚙️</button>
     </div>
     <div id="loc-list"></div>
   `;
@@ -604,6 +652,276 @@ function renderLocations(main) {
         <div class="loc-stats">${stats}</div>
       </div>`;
   }).join('');
+}
+
+function renderStoringen(main) {
+  const openCount = storingen.filter(s => s.status !== 'opgelost').length;
+  main.innerHTML = `
+    <div class="tabs">
+      <button class="tab" onclick="goTo('locations')">📍 Locaties</button>
+      <button class="tab active" onclick="goTo('storingen')">⚠️ Storingen${openCount > 0 ? `<span class="badge">${openCount}</span>` : ''}</button>
+      <button class="tab" onclick="goTo('settings')">⚙️</button>
+    </div>
+    <div id="storing-list"></div>
+  `;
+  const list = document.getElementById('storing-list');
+
+  if (storingen.length === 0) {
+    list.innerHTML = `
+      <div class="empty">
+        <div style="font-size:48px;">⚠️</div>
+        <p><strong>Nog geen storingen gemeld</strong></p>
+        <p>Tik op de + knop om een storing te melden.</p>
+      </div>`;
+    return;
+  }
+
+  // Sorteer: open eerst, dan behandeling, dan opgelost; binnen status op datum (nieuwste eerst)
+  const order = { 'open': 0, 'behandeling': 1, 'opgelost': 2 };
+  const sorted = [...storingen].sort((a,b) => {
+    const so = (order[a.status] || 0) - (order[b.status] || 0);
+    if (so !== 0) return so;
+    return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+  });
+
+  list.innerHTML = sorted.map(s => {
+    const loc = s.locationId ? locations.find(l => l.id === s.locationId) : null;
+    const item = s.itemId ? items.find(i => i.id === s.itemId) : null;
+    const icon = s.photo ? `<img src="${s.photo}" alt="" />` : '⚠️';
+    return `
+      <div class="item-card" onclick="editStoring(${s.id})">
+        <div class="item-icon storing-icon">${icon}</div>
+        <div class="item-body">
+          <div class="item-name">${escapeHtml(s.title)}</div>
+          <div class="item-meta">${loc ? '📍 ' + escapeHtml(loc.name) : 'Geen locatie'}${item ? ' • 🔧 ' + escapeHtml(item.name) : ''}</div>
+          <div class="item-meta">${formatDate(s.createdAt) || ''}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+          <span class="status-tag status-${s.status === 'open' ? 'open' : (s.status === 'behandeling' ? 'bezig' : 'klaar')}">${storingStatusLabel(s.status)}</span>
+          ${s.prio === 'hoog' ? '<span class="prio-tag prio-hoog">⚡</span>' : ''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderStoringForm(main) {
+  const isEdit = !!view.editStoringId;
+  const s = isEdit ? storingen.find(x => x.id === view.editStoringId) : null;
+  currentPhoto = s?.photo || null;
+
+  const locOptions = `<option value="">— geen locatie —</option>` + locations.map(l =>
+    `<option value="${l.id}" ${s?.locationId === l.id ? 'selected' : ''}>${escapeHtml(l.name)}</option>`
+  ).join('');
+
+  // Initial: alleen items van geselecteerde locatie
+  const selectedLocId = s?.locationId || '';
+  const itemsForLoc = selectedLocId ? items.filter(i => i.locationId === selectedLocId) : [];
+  const itemOptions = `<option value="">— geen onderdeel —</option>` + itemsForLoc.map(i =>
+    `<option value="${i.id}" ${s?.itemId === i.id ? 'selected' : ''}>${escapeHtml(i.name)}${i.room ? ' (' + escapeHtml(i.room) + ')' : ''}</option>`
+  ).join('');
+
+  main.innerHTML = `
+    <div class="card">
+      <p class="card-title"><span class="step">1</span> Wat is er aan de hand?</p>
+      <div class="field">
+        <label>Korte titel *</label>
+        <input type="text" id="storing-title" placeholder="Bijv. CV-ketel lekt, sprinkler druppelt, schade aan hekwerk" value="${escapeHtml(s?.title || '')}" />
+      </div>
+      <div class="field">
+        <label>Omschrijving van het probleem *</label>
+        <textarea id="storing-desc" rows="4" placeholder="Beschrijf wat er aan de hand is: wanneer is het ontstaan, hoe ernstig, wat heb je al gedaan, etc.">${escapeHtml(s?.description || '')}</textarea>
+      </div>
+      <div class="row">
+        <div>
+          <label>Status</label>
+          <select id="storing-status">
+            <option value="open" ${(!s || s.status === 'open') ? 'selected' : ''}>📋 Open</option>
+            <option value="behandeling" ${s?.status === 'behandeling' ? 'selected' : ''}>🔧 In behandeling</option>
+            <option value="opgelost" ${s?.status === 'opgelost' ? 'selected' : ''}>✓ Opgelost</option>
+          </select>
+        </div>
+        <div>
+          <label>Prioriteit</label>
+          <select id="storing-prio">
+            <option value="laag" ${s?.prio === 'laag' ? 'selected' : ''}>Laag</option>
+            <option value="normaal" ${(!s || s.prio === 'normaal') ? 'selected' : ''}>Normaal</option>
+            <option value="hoog" ${s?.prio === 'hoog' ? 'selected' : ''}>⚡ Hoog / spoed</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="card-title"><span class="step">2</span> 📸 Foto van het probleem</p>
+      <div class="camera-box" id="camera-box">
+        <div class="camera-placeholder ${currentPhoto ? 'hidden' : ''}" id="camera-placeholder">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          <div>Geen foto</div>
+        </div>
+        <video id="camera-video" autoplay playsinline class="hidden"></video>
+        <img id="captured-img" class="${currentPhoto ? '' : 'hidden'}" alt="" ${currentPhoto ? `src="${currentPhoto}"` : ''} />
+      </div>
+      <div class="row">
+        <button class="btn btn-secondary" onclick="startCamera()">📷 Camera</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('file-input').click()">📁 Bibliotheek</button>
+      </div>
+      <input type="file" id="file-input" accept="image/*" style="display:none" onchange="handleFileUploadStoring(event)" />
+      <button id="capture-btn" class="btn btn-primary hidden" style="margin-top: 8px;" onclick="capturePhotoStoring()">📸 Maak foto</button>
+    </div>
+
+    <div class="card">
+      <p class="card-title"><span class="step">3</span> 🔗 Koppelen (optioneel)</p>
+      <div class="field">
+        <label>Op welke locatie?</label>
+        <select id="storing-location" onchange="onStoringLocationChange()">${locOptions}</select>
+      </div>
+      <div class="field">
+        <label>Welk onderdeel? (optioneel)</label>
+        <select id="storing-item">${itemOptions}</select>
+      </div>
+      <div class="field">
+        <label>Melder (optioneel)</label>
+        <input type="text" id="storing-melder" placeholder="Naam van degene die het meldt" value="${escapeHtml(s?.melder || '')}" />
+      </div>
+    </div>
+
+    ${isEdit ? `
+      <button class="btn btn-primary" onclick="saveStoring()">✓ Wijzigingen opslaan</button>
+      <div class="row-actions">
+        <button class="btn btn-secondary" onclick="markStoringOpgelost()">✓ Markeer opgelost</button>
+        <button class="btn btn-danger" onclick="deleteStoring()">🗑 Verwijder</button>
+      </div>
+    ` : `
+      <button class="btn btn-primary" onclick="saveStoring()">✓ Storing melden</button>
+    `}
+  `;
+}
+
+function onStoringLocationChange() {
+  const locId = parseInt(document.getElementById('storing-location').value);
+  const sel = document.getElementById('storing-item');
+  const itemsForLoc = locId ? items.filter(i => i.locationId === locId) : [];
+  sel.innerHTML = `<option value="">— geen onderdeel —</option>` + itemsForLoc.map(i =>
+    `<option value="${i.id}">${escapeHtml(i.name)}${i.room ? ' (' + escapeHtml(i.room) + ')' : ''}</option>`
+  ).join('');
+}
+
+function handleFileUploadStoring(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    currentPhoto = ev.target.result;
+    showCapturedPhoto();
+  };
+  reader.readAsDataURL(file);
+}
+
+function capturePhotoStoring() {
+  const video = document.getElementById('camera-video');
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  currentPhoto = canvas.toDataURL('image/jpeg', 0.7);
+  showCapturedPhoto();
+  stopCamera();
+}
+
+async function saveStoring() {
+  const title = document.getElementById('storing-title').value.trim();
+  const desc = document.getElementById('storing-desc').value.trim();
+  if (!title) { alert('Geef de storing een titel.'); return; }
+  if (!desc) { alert('Geef een omschrijving van het probleem.'); return; }
+
+  let photoToSave = currentPhoto;
+  if (photoToSave && photoToSave.length > 50000) {
+    try { photoToSave = await compressPhoto(photoToSave); }
+    catch (err) { console.warn('Foto comprimeren mislukt:', err); photoToSave = null; }
+  }
+
+  const locId = document.getElementById('storing-location').value;
+  const itemId = document.getElementById('storing-item').value;
+
+  const data = {
+    title,
+    description: desc,
+    status: document.getElementById('storing-status').value,
+    prio: document.getElementById('storing-prio').value,
+    locationId: locId ? parseInt(locId) : null,
+    itemId: itemId ? parseInt(itemId) : null,
+    melder: document.getElementById('storing-melder').value.trim(),
+    photo: photoToSave
+  };
+
+  const backup = [...storingen];
+
+  if (view.editStoringId) {
+    const s = storingen.find(x => x.id === view.editStoringId);
+    if (s) Object.assign(s, data);
+  } else {
+    storingen.push({ id: Date.now(), ...data, createdAt: new Date().toISOString() });
+  }
+
+  try {
+    save();
+  } catch (err) {
+    if (err.name === 'QuotaExceededError' || /quota/i.test(err.message)) {
+      const newest = storingen[storingen.length - 1];
+      if (newest && newest.photo) {
+        newest.photo = null;
+        try {
+          save();
+          alert('⚠️ Storing opgeslagen zonder foto.\n\nDe browseropslag zit bijna vol.');
+        } catch {
+          storingen = backup;
+          alert('❌ Opslaan mislukt: de browseropslag zit vol.');
+          return;
+        }
+      } else {
+        storingen = backup;
+        alert('❌ Opslaan mislukt: de browseropslag zit vol.');
+        return;
+      }
+    } else {
+      storingen = backup;
+      alert('❌ Opslaan mislukt: ' + err.message);
+      return;
+    }
+  }
+
+  stopCamera();
+  view.editStoringId = null;
+  view.screen = 'storingen';
+  render();
+}
+
+function markStoringOpgelost() {
+  if (!confirm('Deze storing markeren als opgelost?')) return;
+  const s = storingen.find(x => x.id === view.editStoringId);
+  if (s) { s.status = 'opgelost'; s.opgelostAt = new Date().toISOString(); save(); }
+  view.editStoringId = null;
+  view.screen = 'storingen';
+  render();
+}
+
+function deleteStoring() {
+  if (!confirm('Deze storingsmelding verwijderen?')) return;
+  storingen = storingen.filter(x => x.id !== view.editStoringId);
+  save();
+  view.editStoringId = null;
+  view.screen = 'storingen';
+  render();
+}
+
+function editStoring(id) {
+  view = { ...view, screen: 'storing-form', editStoringId: id };
+  window.scrollTo(0, 0);
+  render();
+}
+
+function storingStatusLabel(s) {
+  return { open: '📋 Open', behandeling: '🔧 Bezig', opgelost: '✓ Opgelost' }[s] || s;
 }
 
 function renderLocationDetail(main, loc) {
@@ -1132,10 +1450,12 @@ function editKlus(id) {
 
 // ============ SETTINGS ============
 function renderSettings(main) {
+  const openStoringen = storingen.filter(s => s.status !== 'opgelost').length;
   main.innerHTML = `
     <div class="tabs">
-      <button class="tab" onclick="goTo('locations')">Locaties</button>
-      <button class="tab active" onclick="goTo('settings')">Instellingen</button>
+      <button class="tab" onclick="goTo('locations')">📍 Locaties</button>
+      <button class="tab" onclick="goTo('storingen')">⚠️ Storingen${openStoringen > 0 ? `<span class="badge">${openStoringen}</span>` : ''}</button>
+      <button class="tab active" onclick="goTo('settings')">⚙️</button>
     </div>
 
     <div class="card">
@@ -1169,6 +1489,12 @@ function renderSettings(main) {
       </div>
       <button class="btn btn-primary" onclick="saveSettings()">Opslaan</button>
       ${settings.geminiKey ? `<button class="btn btn-secondary" style="width:100%;margin-top:8px;" onclick="testGemini(this)">🧪 Test verbinding</button>` : ''}
+      ${settings.geminiKey ? `
+        <div style="margin-top:12px;padding:10px;background:var(--bg);border-radius:8px;font-size:13px;">
+          <strong>Vandaag gebruikt:</strong> ${getAiUsage()} van 250 verzoeken
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Limiet gratis tier: 10 per minuut, 250 per dag. Reset rond 09:00 NL.</div>
+        </div>
+      ` : ''}
     </div>
 
     <div class="card">
@@ -1198,10 +1524,10 @@ function renderSettings(main) {
     <div class="card">
       <p class="card-title">ℹ️ Over</p>
       <p style="font-size: 13px; color: var(--text-muted);">
-        Universele onderhoudsapp v0.4 – Met Gemini AI voor beeldherkenning en prijsschatting.
+        Universele onderhoudsapp v0.5 – Met storingsmeldingen, klussen en AI-beeldherkenning.
       </p>
       <p style="font-size: 12px; color: var(--text-muted);">
-        ${locations.length} locaties • ${items.length} onderdelen • ${klussen.length} klussen
+        ${locations.length} locaties • ${items.length} onderdelen • ${klussen.length} klussen • ${storingen.length} storingen
       </p>
     </div>
   `;
@@ -1243,8 +1569,9 @@ async function testGemini(btn) {
 
 // ============ NAVIGATION ============
 function goTo(screen) {
-  view = { screen, locationId: null, locationTab: 'onderdelen', editItemId: null, editLocationId: null, editKlusId: null };
+  view = { screen, locationId: null, locationTab: 'onderdelen', editItemId: null, editLocationId: null, editKlusId: null, editStoringId: null };
   stopCamera();
+  currentPhoto = null;
   window.scrollTo(0, 0);
   render();
 }
@@ -1269,13 +1596,13 @@ function goBack() {
 }
 
 function openLocation(id) {
-  view = { screen: 'location-detail', locationId: id, locationTab: 'onderdelen', editItemId: null, editLocationId: null, editKlusId: null };
+  view = { screen: 'location-detail', locationId: id, locationTab: 'onderdelen', editItemId: null, editLocationId: null, editKlusId: null, editStoringId: null };
   window.scrollTo(0, 0);
   render();
 }
 
 function editLocation(id) {
-  view = { screen: 'location-form', locationId: id, locationTab: view.locationTab, editItemId: null, editLocationId: id, editKlusId: null };
+  view = { screen: 'location-form', locationId: id, locationTab: view.locationTab, editItemId: null, editLocationId: id, editKlusId: null, editStoringId: null };
   window.scrollTo(0, 0);
   render();
 }
@@ -1288,7 +1615,10 @@ function editItem(id) {
 
 function onFabClick() {
   if (view.screen === 'locations') {
-    view = { screen: 'location-form', locationId: null, locationTab: 'onderdelen', editItemId: null, editLocationId: null, editKlusId: null };
+    view = { screen: 'location-form', locationId: null, locationTab: 'onderdelen', editItemId: null, editLocationId: null, editKlusId: null, editStoringId: null };
+  } else if (view.screen === 'storingen') {
+    currentPhoto = null;
+    view = { screen: 'storing-form', locationId: null, locationTab: 'onderdelen', editItemId: null, editLocationId: null, editKlusId: null, editStoringId: null };
   } else if (view.screen === 'location-detail') {
     if (locations.length === 0) { alert('Maak eerst een locatie aan.'); return; }
     if (view.locationTab === 'klussen') {
@@ -1344,11 +1674,22 @@ function deleteLocation(id) {
   goTo('locations');
 }
 
-function saveItem() {
+async function saveItem() {
   const name = document.getElementById('item-name').value.trim();
   const locationId = parseInt(document.getElementById('item-location').value);
   if (!name) { alert('Geef het onderdeel een naam.'); return; }
   if (!locationId) { alert('Kies een locatie.'); return; }
+
+  // Comprimeer foto voor opslag (anders vult localStorage te snel)
+  let photoToSave = currentPhoto;
+  if (photoToSave && photoToSave.length > 50000) {
+    try {
+      photoToSave = await compressPhoto(photoToSave);
+    } catch (err) {
+      console.warn('Foto comprimeren mislukt, sla op zonder foto:', err);
+      photoToSave = null;
+    }
+  }
 
   const data = {
     locationId, name,
@@ -1361,8 +1702,11 @@ function saveItem() {
     notes: document.getElementById('item-notes').value.trim(),
     nextDate: document.getElementById('item-next').value,
     remindDays: parseInt(document.getElementById('item-remind').value) || 14,
-    photo: currentPhoto
+    photo: photoToSave
   };
+
+  // Bewaar oude staat voor rollback bij opslagfout
+  const backup = { items: [...items], hadEdit: !!view.editItemId };
 
   if (view.editItemId) {
     const item = items.find(i => i.id === view.editItemId);
@@ -1371,7 +1715,36 @@ function saveItem() {
     items.push({ id: Date.now(), ...data, createdAt: new Date().toISOString() });
   }
 
-  save();
+  // Probeer op te slaan; als localStorage vol is, probeer zonder foto
+  try {
+    save();
+  } catch (err) {
+    if (err.name === 'QuotaExceededError' || /quota/i.test(err.message)) {
+      // Probeer opnieuw zonder foto
+      const newest = items[items.length - 1];
+      if (newest && newest.photo) {
+        newest.photo = null;
+        try {
+          save();
+          alert('⚠️ Onderdeel opgeslagen zonder foto.\n\nDe browseropslag zit bijna vol. Verwijder oude onderdelen of exporteer en wis je data om ruimte te maken.');
+        } catch (err2) {
+          items = backup.items;
+          alert('❌ Opslaan mislukt: de browseropslag zit vol.\n\nExporteer je data, wis hem en importeer terug. Of verwijder onderdelen met foto.');
+          return;
+        }
+      } else {
+        items = backup.items;
+        alert('❌ Opslaan mislukt: de browseropslag zit vol.\n\nExporteer je data, wis hem en importeer terug.');
+        return;
+      }
+    } else {
+      items = backup.items;
+      alert('❌ Opslaan mislukt: ' + err.message);
+      console.error(err);
+      return;
+    }
+  }
+
   stopCamera();
   view.screen = 'location-detail';
   view.locationTab = 'onderdelen';
@@ -1459,6 +1832,25 @@ async function analyzeImage() {
   }
 }
 
+// Comprimeert een dataURL-foto naar max 1024px en JPEG-kwaliteit 0.6.
+// Zo blijft een foto onder ~200 KB en past hij makkelijk in localStorage.
+function compressPhoto(dataUrl, maxWidth = 1024, quality = 0.6) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      let w = img.width, h = img.height;
+      if (w > maxWidth) { h = Math.round(h * maxWidth / w); w = maxWidth; }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => reject(new Error('Foto kon niet worden gelezen'));
+    img.src = dataUrl;
+  });
+}
+
 async function analyzeImageGemini() {
   const loadingDiv = document.getElementById('camera-loading');
   loadingDiv?.classList.remove('hidden');
@@ -1482,7 +1874,7 @@ Voor tuinplanten/struiken: gebruik frequentie 180 (halfjaarlijks snoeien) of 365
     const text = await callGemini([
       { text: prompt },
       { inline_data: { mime_type: 'image/jpeg', data: dataUrlToBase64(currentPhoto) } }
-    ], { jsonMode: true, maxTokens: 2048, thinkingBudget: 512 });
+    ], { jsonMode: true, maxTokens: 1024, thinkingBudget: 256 });
 
     const result = extractJSON(text);
     if (!result) {
@@ -1581,7 +1973,7 @@ function renderEmails() {
 }
 
 function exportData() {
-  const data = { locations, items, klussen, emails, exportedAt: new Date().toISOString() };
+  const data = { locations, items, klussen, storingen, emails, exportedAt: new Date().toISOString() };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1601,10 +1993,12 @@ function importData(e) {
       const lCount = data.locations?.length || 0;
       const iCount = data.items?.length || 0;
       const kCount = data.klussen?.length || 0;
-      if (!confirm(`Importeren?\n${lCount} locaties, ${iCount} onderdelen en ${kCount} klussen worden toegevoegd.`)) return;
+      const sCount = data.storingen?.length || 0;
+      if (!confirm(`Importeren?\n${lCount} locaties, ${iCount} onderdelen, ${kCount} klussen en ${sCount} storingen worden toegevoegd.`)) return;
       if (data.locations) locations = locations.concat(data.locations);
       if (data.items) items = items.concat(data.items);
       if (data.klussen) klussen = klussen.concat(data.klussen);
+      if (data.storingen) storingen = storingen.concat(data.storingen);
       if (data.emails) emails = [...new Set(emails.concat(data.emails))];
       save();
       render();
@@ -1617,7 +2011,7 @@ function importData(e) {
 function clearAll() {
   if (!confirm('ALLE data wissen? Dit kan niet ongedaan worden.')) return;
   if (!confirm('Weet je het echt zeker?')) return;
-  locations = []; items = []; klussen = []; emails = [];
+  locations = []; items = []; klussen = []; storingen = []; emails = [];
   // Bewaar API-key en AI-instelling
   const keep = { geminiKey: settings.geminiKey, aiEnabled: settings.aiEnabled };
   localStorage.clear();
@@ -1630,6 +2024,7 @@ function save() {
   localStorage.setItem('locations', JSON.stringify(locations));
   localStorage.setItem('items', JSON.stringify(items));
   localStorage.setItem('klussen', JSON.stringify(klussen));
+  localStorage.setItem('storingen', JSON.stringify(storingen));
   localStorage.setItem('emails', JSON.stringify(emails));
   localStorage.setItem('settings', JSON.stringify(settings));
 }
