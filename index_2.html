@@ -1,0 +1,1619 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#0c4a6e" />
+<title>Aqua+ Onderhoudsapp</title>
+<style>
+  :root {
+    --bg: #f5f7fa;
+    --surface: #ffffff;
+    --border: #e2e8f0;
+    --text: #1e293b;
+    --text-muted: #64748b;
+    --primary: #0c4a6e;
+    --primary-light: #e0f2fe;
+    --success: #16a34a;
+    --success-light: #dcfce7;
+    --warning: #d97706;
+    --warning-light: #fef3c7;
+    --danger: #dc2626;
+    --danger-light: #fee2e2;
+    --purple: #7c3aed;
+    --purple-light: #ede9fe;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    padding-bottom: 90px;
+  }
+  header {
+    background: var(--primary);
+    color: white;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    gap: 8px;
+  }
+  header h1 { margin: 0; font-size: 17px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  header .back-btn {
+    background: rgba(255,255,255,0.15);
+    border: none;
+    color: white;
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  main { max-width: 720px; margin: 0 auto; padding: 16px; }
+
+  .tabs {
+    display: flex;
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 4px;
+    margin-bottom: 16px;
+    border: 1px solid var(--border);
+  }
+  .tab {
+    flex: 1;
+    padding: 10px;
+    text-align: center;
+    border: none;
+    background: transparent;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: 8px;
+  }
+  .tab.active {
+    background: var(--primary);
+    color: white;
+  }
+  .tab .badge {
+    background: var(--danger);
+    color: white;
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 10px;
+    margin-left: 4px;
+  }
+
+  .card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    padding: 14px 16px;
+    margin-bottom: 12px;
+  }
+  .card-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-title .step {
+    background: var(--primary-light);
+    color: var(--primary);
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-weight: 600;
+  }
+
+  label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+    font-weight: 500;
+  }
+  input[type="text"], input[type="email"], input[type="date"], input[type="number"], input[type="password"], select, textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    background: var(--surface);
+    color: var(--text);
+  }
+  input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(12, 74, 110, 0.1);
+  }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .field { margin-bottom: 10px; }
+
+  .toggle-group {
+    display: flex;
+    background: var(--bg);
+    border-radius: 8px;
+    padding: 3px;
+  }
+  .toggle-btn {
+    flex: 1;
+    padding: 8px;
+    border: none;
+    background: transparent;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: 6px;
+  }
+  .toggle-btn.active {
+    background: var(--surface);
+    color: var(--primary);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+
+  .btn {
+    padding: 11px 18px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .btn-primary { background: var(--primary); color: white; width: 100%; }
+  .btn-secondary { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
+  .btn-danger { background: var(--danger-light); color: var(--danger); }
+  .btn-small { padding: 6px 10px; font-size: 12px; }
+  .btn:disabled { opacity: 0.5; cursor: wait; }
+
+  .camera-box {
+    background: #1e293b;
+    border-radius: var(--radius);
+    aspect-ratio: 4/3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+    margin-bottom: 10px;
+  }
+  .camera-box video, .camera-box img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .camera-placeholder {
+    color: #94a3b8;
+    text-align: center;
+    padding: 20px;
+  }
+  .camera-placeholder svg { width: 48px; height: 48px; opacity: 0.6; }
+  .camera-loading {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .ai-result {
+    background: var(--success-light);
+    border-left: 3px solid var(--success);
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    font-size: 13px;
+  }
+  .ai-result strong { color: var(--success); }
+  .ai-result.purple {
+    background: var(--purple-light);
+    border-left-color: var(--purple);
+  }
+  .ai-result.purple strong { color: var(--purple); }
+
+  .loc-card, .item-card, .klus-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .loc-card { padding: 14px; }
+  .loc-card:active, .item-card:active, .klus-card:active { background: var(--bg); }
+  .loc-icon {
+    width: 44px; height: 44px;
+    background: var(--primary-light); color: var(--primary);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; flex-shrink: 0;
+  }
+  .loc-body, .item-body { flex: 1; min-width: 0; }
+  .loc-name { font-weight: 600; font-size: 15px; margin-bottom: 2px; }
+  .loc-meta { font-size: 12px; color: var(--text-muted); }
+  .loc-stats {
+    display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
+  }
+  .loc-stat {
+    background: var(--bg); color: var(--text-muted);
+    padding: 2px 8px; border-radius: 10px;
+    font-size: 11px; font-weight: 600; white-space: nowrap;
+  }
+  .loc-stat.warning { background: var(--warning-light); color: var(--warning); }
+  .loc-stat.danger { background: var(--danger-light); color: var(--danger); }
+  .loc-stat.purple { background: var(--purple-light); color: var(--purple); }
+
+  .item-icon {
+    width: 50px; height: 50px;
+    background: var(--primary-light); color: var(--primary);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; font-size: 20px; overflow: hidden;
+  }
+  .item-icon img { width: 100%; height: 100%; object-fit: cover; }
+  .item-name { font-weight: 600; font-size: 14px; margin-bottom: 2px; }
+  .item-meta { font-size: 12px; color: var(--text-muted); }
+  .item-due {
+    font-size: 11px; padding: 4px 8px; border-radius: 6px;
+    font-weight: 600; white-space: nowrap;
+  }
+  .due-soon { background: var(--warning-light); color: var(--warning); }
+  .due-overdue { background: var(--danger-light); color: var(--danger); }
+  .due-ok { background: var(--success-light); color: var(--success); }
+
+  .klus-card { flex-direction: column; align-items: stretch; padding: 12px; }
+  .klus-row1 { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .klus-name { font-weight: 600; font-size: 14px; flex: 1; }
+  .klus-row2 { font-size: 12px; color: var(--text-muted); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+  .status-tag, .prio-tag {
+    font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 600;
+  }
+  .status-open { background: var(--bg); color: var(--text-muted); }
+  .status-bezig { background: var(--warning-light); color: var(--warning); }
+  .status-klaar { background: var(--success-light); color: var(--success); }
+  .prio-hoog { background: var(--danger-light); color: var(--danger); }
+
+  .empty {
+    text-align: center; padding: 40px 20px; color: var(--text-muted);
+  }
+
+  .hidden { display: none !important; }
+
+  .email-tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: var(--primary-light); color: var(--primary);
+    padding: 4px 8px; border-radius: 6px;
+    font-size: 12px; margin: 2px;
+  }
+  .email-tag button {
+    background: none; border: none; color: var(--primary);
+    cursor: pointer; padding: 0; font-size: 14px;
+  }
+
+  .fab {
+    position: fixed;
+    bottom: 20px; right: 20px;
+    background: var(--primary); color: white;
+    width: 56px; height: 56px;
+    border-radius: 50%; border: none;
+    font-size: 28px; cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 50;
+  }
+
+  .screen-title {
+    font-size: 18px; font-weight: 600; margin: 0 0 14px;
+  }
+  .ctx-tag {
+    display: inline-block;
+    font-size: 11px; padding: 2px 8px;
+    border-radius: 4px; font-weight: 600;
+    margin-left: 6px;
+  }
+  .ctx-zakelijk { background: var(--primary-light); color: var(--primary); }
+  .ctx-prive { background: #fef3c7; color: #92400e; }
+
+  .row-actions { display: flex; gap: 8px; margin-top: 12px; }
+  .row-actions .btn { flex: 1; }
+
+  .tool-row, .order-row {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 8px; padding: 8px;
+    background: var(--bg); border-radius: 8px;
+  }
+  .tool-row .check {
+    width: 22px; height: 22px;
+    border: 2px solid var(--border); border-radius: 4px;
+    background: white; cursor: pointer;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; color: var(--success); font-weight: 700;
+  }
+  .tool-row .check.checked { background: var(--success-light); border-color: var(--success); }
+  .tool-row input { flex: 1; background: white; }
+  .tool-row .del, .order-row .del {
+    background: none; border: none; color: var(--text-muted);
+    font-size: 18px; cursor: pointer; padding: 4px 6px;
+  }
+
+  .order-row { flex-wrap: wrap; gap: 6px; }
+  .order-row .order-line1, .order-row .order-line2 {
+    display: flex; gap: 6px; width: 100%; align-items: center;
+  }
+  .order-row input.name-input { flex: 2; background: white; }
+  .order-row input.qty-input { width: 60px; background: white; text-align: center; }
+  .order-row input.price-input { width: 90px; background: white; text-align: right; }
+  .order-row select.sup-select { flex: 1; background: white; min-width: 0; }
+  .order-row .search-btn {
+    background: var(--primary-light); color: var(--primary);
+    border: none; padding: 8px 10px; border-radius: 6px;
+    cursor: pointer; font-size: 12px; font-weight: 600;
+    white-space: nowrap;
+  }
+  .order-row .ai-btn {
+    background: var(--purple-light); color: var(--purple);
+    border: none; padding: 8px 10px; border-radius: 6px;
+    cursor: pointer; font-size: 12px; font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .total-box {
+    background: var(--primary-light); border-radius: 8px;
+    padding: 12px;
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: 10px;
+  }
+  .total-label { font-size: 13px; color: var(--primary); }
+  .total-amount { font-size: 18px; font-weight: 700; color: var(--primary); }
+
+  .info-banner, .warn-banner, .success-banner {
+    padding: 10px 12px; border-radius: 8px;
+    font-size: 12px; margin-bottom: 12px;
+    display: flex; gap: 8px; align-items: flex-start;
+  }
+  .info-banner { background: var(--primary-light); color: var(--primary); }
+  .warn-banner { background: var(--warning-light); color: var(--warning); }
+  .success-banner { background: var(--success-light); color: var(--success); }
+
+  a { color: var(--primary); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1 id="header-title">🔧 Onderhoudsapp</h1>
+  <button style="color:white;background:rgba(255,255,255,0.15);border:none;padding:6px 10px;border-radius:8px;font-size:12px;cursor:pointer;" onclick="exportData()">⬇</button>
+</header>
+
+<main id="main"></main>
+
+<button id="fab" class="fab hidden" onclick="onFabClick()">+</button>
+
+<script>
+// ============ STATE ============
+let locations = JSON.parse(localStorage.getItem('locations') || '[]');
+let items = JSON.parse(localStorage.getItem('items') || '[]');
+let klussen = JSON.parse(localStorage.getItem('klussen') || '[]');
+let emails = JSON.parse(localStorage.getItem('emails') || '[]');
+let settings = JSON.parse(localStorage.getItem('settings') || '{}');
+
+// Migrate old settings field name
+if (settings.apiKey && !settings.geminiKey) settings.geminiKey = settings.apiKey;
+if (!settings.geminiKey) settings.geminiKey = '';
+if (settings.aiEnabled === undefined) settings.aiEnabled = false;
+
+const GEMINI_MODEL = 'gemini-2.5-flash';
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+
+const SUPPLIERS = {
+  'gamma':     { name: 'Gamma',     url: q => `https://www.gamma.nl/assortiment/zoeken?text=${encodeURIComponent(q)}` },
+  'praxis':    { name: 'Praxis',    url: q => `https://www.praxis.nl/zoeken?searchTerm=${encodeURIComponent(q)}` },
+  'hornbach':  { name: 'Hornbach',  url: q => `https://www.hornbach.nl/s/?q=${encodeURIComponent(q)}` },
+  'karwei':    { name: 'Karwei',    url: q => `https://www.karwei.nl/zoeken?text=${encodeURIComponent(q)}` },
+  'bol':       { name: 'Bol.com',   url: q => `https://www.bol.com/nl/nl/s/?searchtext=${encodeURIComponent(q)}` },
+  'amazon':    { name: 'Amazon',    url: q => `https://www.amazon.nl/s?k=${encodeURIComponent(q)}` },
+  'overig':    { name: 'Overig',    url: q => `https://www.google.com/search?q=${encodeURIComponent(q + ' kopen')}&tbm=shop` }
+};
+
+let view = { screen: 'locations', locationId: null, locationTab: 'onderdelen', editItemId: null, editLocationId: null, editKlusId: null };
+let currentPhoto = null;
+let stream = null;
+let currentKlus = null;
+
+// ============ GEMINI HELPERS ============
+async function callGemini(parts) {
+  if (!settings.geminiKey) throw new Error('Geen Gemini API-key ingesteld. Ga naar Instellingen.');
+  const res = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(settings.geminiKey)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts }],
+      generationConfig: { temperature: 0.2, maxOutputTokens: 500 }
+    })
+  });
+  if (!res.ok) {
+    let errMsg = `API fout (${res.status})`;
+    try {
+      const err = await res.json();
+      errMsg += ': ' + (err.error?.message || JSON.stringify(err)).substring(0, 200);
+    } catch {}
+    throw new Error(errMsg);
+  }
+  const data = await res.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+}
+
+function dataUrlToBase64(dataUrl) {
+  const idx = dataUrl.indexOf(',');
+  return idx >= 0 ? dataUrl.substring(idx + 1) : dataUrl;
+}
+
+// ============ RENDER ============
+function render() {
+  const main = document.getElementById('main');
+  const headerTitle = document.getElementById('header-title');
+  const fab = document.getElementById('fab');
+
+  if (view.screen === 'locations') {
+    headerTitle.innerHTML = '🔧 Locaties';
+    fab.classList.remove('hidden');
+    renderLocations(main);
+  } else if (view.screen === 'location-detail') {
+    const loc = locations.find(l => l.id === view.locationId);
+    headerTitle.innerHTML = `<button class="back-btn" onclick="goTo('locations')">←</button> ${escapeHtml(loc?.name || '')}`;
+    fab.classList.remove('hidden');
+    renderLocationDetail(main, loc);
+  } else if (view.screen === 'location-form') {
+    headerTitle.innerHTML = `<button class="back-btn" onclick="goBack()">←</button> ${view.editLocationId ? 'Locatie bewerken' : 'Nieuwe locatie'}`;
+    fab.classList.add('hidden');
+    renderLocationForm(main);
+  } else if (view.screen === 'item-form') {
+    headerTitle.innerHTML = `<button class="back-btn" onclick="goBack()">←</button> ${view.editItemId ? 'Onderdeel bewerken' : 'Nieuw onderdeel'}`;
+    fab.classList.add('hidden');
+    renderItemForm(main);
+  } else if (view.screen === 'klus-form') {
+    headerTitle.innerHTML = `<button class="back-btn" onclick="goBack()">←</button> ${view.editKlusId ? 'Klus bewerken' : 'Nieuwe klus'}`;
+    fab.classList.add('hidden');
+    renderKlusForm(main);
+  } else if (view.screen === 'settings') {
+    headerTitle.innerHTML = '⚙️ Instellingen';
+    fab.classList.add('hidden');
+    renderSettings(main);
+  }
+}
+
+function renderLocations(main) {
+  main.innerHTML = `
+    <div class="tabs">
+      <button class="tab active" onclick="goTo('locations')">Locaties</button>
+      <button class="tab" onclick="goTo('settings')">Instellingen</button>
+    </div>
+    <div id="loc-list"></div>
+  `;
+  const list = document.getElementById('loc-list');
+
+  if (locations.length === 0) {
+    list.innerHTML = `
+      <div class="empty">
+        <div style="font-size:48px;">📍</div>
+        <p><strong>Nog geen locaties</strong></p>
+        <p>Tik op de + knop om je eerste locatie toe te voegen.</p>
+      </div>`;
+    return;
+  }
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  list.innerHTML = locations.map(loc => {
+    const locItems = items.filter(i => i.locationId === loc.id);
+    const locKlussen = klussen.filter(k => k.locationId === loc.id && k.status !== 'klaar');
+    let overdue = 0, soon = 0;
+    locItems.forEach(i => {
+      const due = new Date(i.nextDate);
+      const daysLeft = Math.floor((due - today) / (1000*60*60*24));
+      if (daysLeft < 0) overdue++;
+      else if (daysLeft <= (i.remindDays || 14)) soon++;
+    });
+
+    let stats = '';
+    if (overdue > 0) stats += `<div class="loc-stat danger">${overdue} over tijd</div>`;
+    else if (soon > 0) stats += `<div class="loc-stat warning">${soon} binnenkort</div>`;
+    if (locKlussen.length > 0) stats += `<div class="loc-stat purple">${locKlussen.length} ${locKlussen.length === 1 ? 'klus' : 'klussen'}</div>`;
+    if (!stats) stats = `<div class="loc-stat">${locItems.length} onderdelen</div>`;
+
+    const ctxTag = `<span class="ctx-tag ctx-${loc.context}">${loc.context === 'zakelijk' ? 'Zakelijk' : 'Privé'}</span>`;
+    return `
+      <div class="loc-card" onclick="openLocation(${loc.id})">
+        <div class="loc-icon">${loc.context === 'zakelijk' ? '🏢' : '🏠'}</div>
+        <div class="loc-body">
+          <div class="loc-name">${escapeHtml(loc.name)}${ctxTag}</div>
+          <div class="loc-meta">${escapeHtml(loc.address || '')}</div>
+        </div>
+        <div class="loc-stats">${stats}</div>
+      </div>`;
+  }).join('');
+}
+
+function renderLocationDetail(main, loc) {
+  if (!loc) { goTo('locations'); return; }
+  const locItems = items.filter(i => i.locationId === loc.id);
+  const locKlussen = klussen.filter(k => k.locationId === loc.id);
+  const openKlussen = locKlussen.filter(k => k.status !== 'klaar').length;
+
+  main.innerHTML = `
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+        <div>
+          <p style="margin:0 0 4px;font-size:12px;color:var(--text-muted);">${loc.context === 'zakelijk' ? 'Zakelijk' : 'Privé'} • ${countryLabel(loc.country)}</p>
+          <p style="margin:0;font-size:13px;">${escapeHtml(loc.address || '—')}</p>
+        </div>
+        <button class="btn btn-secondary btn-small" onclick="editLocation(${loc.id})">Bewerken</button>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab ${view.locationTab === 'onderdelen' ? 'active' : ''}" onclick="setLocationTab('onderdelen')">
+        Onderdelen <span style="opacity:0.7;font-size:11px;">(${locItems.length})</span>
+      </button>
+      <button class="tab ${view.locationTab === 'klussen' ? 'active' : ''}" onclick="setLocationTab('klussen')">
+        Klussen ${openKlussen > 0 ? `<span class="badge">${openKlussen}</span>` : `<span style="opacity:0.7;font-size:11px;">(${locKlussen.length})</span>`}
+      </button>
+    </div>
+
+    <div id="tab-content"></div>
+  `;
+
+  if (view.locationTab === 'onderdelen') renderItemsTab(loc);
+  else renderKlussenTab(loc);
+}
+
+function renderItemsTab(loc) {
+  const div = document.getElementById('tab-content');
+  const locItems = items.filter(i => i.locationId === loc.id);
+  if (locItems.length === 0) {
+    div.innerHTML = `
+      <div class="empty">
+        <div style="font-size:48px;">📦</div>
+        <p><strong>Nog geen onderdelen</strong></p>
+        <p>Tik op + om er een toe te voegen.</p>
+      </div>`;
+    return;
+  }
+  const today = new Date(); today.setHours(0,0,0,0);
+  const sorted = [...locItems].sort((a,b) => new Date(a.nextDate) - new Date(b.nextDate));
+  div.innerHTML = sorted.map(item => {
+    const due = new Date(item.nextDate);
+    const daysLeft = Math.floor((due - today) / (1000*60*60*24));
+    let dueClass = 'due-ok', dueText = `over ${daysLeft} dgn`;
+    if (daysLeft < 0) { dueClass = 'due-overdue'; dueText = `${-daysLeft} dgn over tijd`; }
+    else if (daysLeft <= (item.remindDays || 14)) { dueClass = 'due-soon'; dueText = `binnen ${daysLeft} dgn`; }
+    const icon = item.photo ? `<img src="${item.photo}" alt="" />` : '🔧';
+    return `
+      <div class="item-card" onclick="editItem(${item.id})">
+        <div class="item-icon">${icon}</div>
+        <div class="item-body">
+          <div class="item-name">${escapeHtml(item.name)}</div>
+          <div class="item-meta">${item.room ? escapeHtml(item.room) + ' • ' : ''}${escapeHtml(item.manufacturer || '')} ${escapeHtml(item.type || '')}</div>
+          ${item.norm ? `<div class="item-meta">${escapeHtml(item.norm)}</div>` : ''}
+        </div>
+        <span class="item-due ${dueClass}">${dueText}</span>
+      </div>`;
+  }).join('');
+}
+
+function renderKlussenTab(loc) {
+  const div = document.getElementById('tab-content');
+  const locKlussen = klussen.filter(k => k.locationId === loc.id);
+  if (locKlussen.length === 0) {
+    div.innerHTML = `
+      <div class="empty">
+        <div style="font-size:48px;">🛠️</div>
+        <p><strong>Nog geen klussen</strong></p>
+        <p>Tik op + om er een toe te voegen.</p>
+      </div>`;
+    return;
+  }
+  const order = { 'open': 0, 'bezig': 1, 'klaar': 2 };
+  const sorted = [...locKlussen].sort((a,b) => {
+    const so = (order[a.status] || 0) - (order[b.status] || 0);
+    if (so !== 0) return so;
+    if (a.deadline && b.deadline) return new Date(a.deadline) - new Date(b.deadline);
+    return 0;
+  });
+  div.innerHTML = sorted.map(k => {
+    const totaal = (k.bestellijst || []).reduce((s,o) => s + (parseFloat(o.prijs) || 0) * (parseInt(o.aantal) || 1), 0);
+    const linked = k.itemId ? items.find(i => i.id === k.itemId) : null;
+    return `
+      <div class="klus-card" onclick="editKlus(${k.id})">
+        <div class="klus-row1">
+          <div class="klus-name">${escapeHtml(k.title)}</div>
+          <span class="status-tag status-${k.status}">${statusLabel(k.status)}</span>
+        </div>
+        <div class="klus-row2">
+          ${k.prio === 'hoog' ? '<span class="prio-tag prio-hoog">⚡ Hoog</span>' : ''}
+          ${k.deadline ? `<span>📅 ${formatDate(k.deadline)}</span>` : ''}
+          ${linked ? `<span>🔗 ${escapeHtml(linked.name)}</span>` : ''}
+          ${totaal > 0 ? `<span>💶 ${formatMoney(totaal)}</span>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function setLocationTab(tab) {
+  view.locationTab = tab;
+  render();
+}
+
+function renderLocationForm(main) {
+  const isEdit = !!view.editLocationId;
+  const loc = isEdit ? locations.find(l => l.id === view.editLocationId) : null;
+
+  main.innerHTML = `
+    <div class="card">
+      <p class="card-title">Locatiegegevens</p>
+      <div class="field">
+        <label>Naam locatie *</label>
+        <input type="text" id="loc-name" placeholder="Bijv. Kantoor Groningen, Thuis, Pand Janssen" value="${escapeHtml(loc?.name || '')}" />
+      </div>
+      <div class="field">
+        <label>Adres (optioneel)</label>
+        <input type="text" id="loc-address" placeholder="Zonneweg 12, Groningen" value="${escapeHtml(loc?.address || '')}" />
+      </div>
+      <div class="row">
+        <div>
+          <label>Type gebruik</label>
+          <div class="toggle-group">
+            <button type="button" class="toggle-btn ${(loc?.context || 'zakelijk') === 'zakelijk' ? 'active' : ''}" data-context="zakelijk" onclick="toggleContext(this)">Zakelijk</button>
+            <button type="button" class="toggle-btn ${loc?.context === 'prive' ? 'active' : ''}" data-context="prive" onclick="toggleContext(this)">Privé</button>
+          </div>
+        </div>
+        <div>
+          <label>Land / norm</label>
+          <select id="loc-country">
+            <option value="NL" ${(loc?.country || 'NL') === 'NL' ? 'selected' : ''}>🇳🇱 Nederland (NEN/NTA)</option>
+            <option value="BE" ${loc?.country === 'BE' ? 'selected' : ''}>🇧🇪 België (NBN)</option>
+            <option value="DE" ${loc?.country === 'DE' ? 'selected' : ''}>🇩🇪 Duitsland (DIN)</option>
+            <option value="EU" ${loc?.country === 'EU' ? 'selected' : ''}>🇪🇺 Europees (EN/ISO)</option>
+            <option value="OTHER" ${loc?.country === 'OTHER' ? 'selected' : ''}>Anders / geen</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    ${isEdit ? `
+      <button class="btn btn-primary" onclick="saveLocation()">✓ Wijzigingen opslaan</button>
+      <div class="row-actions">
+        <button class="btn btn-danger" onclick="deleteLocation(${loc.id})">🗑 Locatie verwijderen</button>
+      </div>
+    ` : `
+      <button class="btn btn-primary" onclick="saveLocation()">✓ Locatie aanmaken</button>
+    `}
+  `;
+}
+
+function renderItemForm(main) {
+  const isEdit = !!view.editItemId;
+  const item = isEdit ? items.find(i => i.id === view.editItemId) : null;
+  currentPhoto = item?.photo || null;
+
+  const locOptions = locations.map(l =>
+    `<option value="${l.id}" ${(item?.locationId || view.locationId) === l.id ? 'selected' : ''}>${escapeHtml(l.name)}</option>`
+  ).join('');
+
+  const aiAvailable = settings.aiEnabled && settings.geminiKey;
+
+  main.innerHTML = `
+    <div class="card">
+      <p class="card-title"><span class="step">1</span> Locatie</p>
+      <div class="field">
+        <label>Op welke locatie?</label>
+        <select id="item-location">${locOptions}</select>
+      </div>
+      <div class="field">
+        <label>Ruimte / specifieke plek (optioneel)</label>
+        <input type="text" id="item-room" placeholder="Bijv. Serverruimte, Achtertuin, Kelder" value="${escapeHtml(item?.room || '')}" />
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="card-title"><span class="step">2</span> Scan onderdeel ${aiAvailable ? '<span style="font-size:11px;background:var(--purple-light);color:var(--purple);padding:2px 6px;border-radius:4px;margin-left:4px;">✨ AI aan</span>' : ''}</p>
+      ${!aiAvailable ? '<div class="info-banner" style="margin-bottom:10px;"><span>ℹ️</span><div>Zet AI aan in Instellingen voor echte beeldherkenning. Zonder AI vult de scan een voorbeeld in.</div></div>' : ''}
+      <div class="camera-box" id="camera-box">
+        <div class="camera-placeholder ${currentPhoto ? 'hidden' : ''}" id="camera-placeholder">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          <div>Geen foto</div>
+        </div>
+        <video id="camera-video" autoplay playsinline class="hidden"></video>
+        <img id="captured-img" class="${currentPhoto ? '' : 'hidden'}" alt="" ${currentPhoto ? `src="${currentPhoto}"` : ''} />
+        <div class="camera-loading hidden" id="camera-loading">✨ AI analyseert foto...</div>
+      </div>
+      <div class="row">
+        <button class="btn btn-secondary" onclick="startCamera()">📷 Camera</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('file-input').click()">📁 Bibliotheek</button>
+      </div>
+      <input type="file" id="file-input" accept="image/*" style="display:none" onchange="handleFileUpload(event)" />
+      <button id="capture-btn" class="btn btn-primary hidden" style="margin-top: 8px;" onclick="capturePhoto()">📸 Maak foto</button>
+    </div>
+
+    <div class="card">
+      <p class="card-title"><span class="step">3</span> Details</p>
+      <div class="ai-result hidden purple" id="ai-result">
+        <strong>AI-voorstel:</strong> <span id="ai-suggestion-text"></span>
+      </div>
+      <div class="field">
+        <label>Naam onderdeel *</label>
+        <input type="text" id="item-name" placeholder="Bijv. Sprinklerkop, CV-ketel, Heggenschaar" value="${escapeHtml(item?.name || '')}" />
+      </div>
+      <div class="row">
+        <div>
+          <label>Fabrikant</label>
+          <input type="text" id="item-manufacturer" placeholder="Bijv. Viking" value="${escapeHtml(item?.manufacturer || '')}" />
+        </div>
+        <div>
+          <label>Type / model</label>
+          <input type="text" id="item-type" placeholder="Bijv. VK102" value="${escapeHtml(item?.type || '')}" />
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Geïnstalleerd op</label>
+          <input type="date" id="item-installed" value="${item?.installed || ''}" />
+        </div>
+        <div>
+          <label>Onderhoudsfrequentie</label>
+          <select id="item-frequency">
+            <option value="30" ${item?.frequency === 30 ? 'selected' : ''}>Maandelijks</option>
+            <option value="90" ${item?.frequency === 90 ? 'selected' : ''}>Per kwartaal</option>
+            <option value="180" ${item?.frequency === 180 ? 'selected' : ''}>Halfjaarlijks</option>
+            <option value="365" ${!item || item?.frequency === 365 ? 'selected' : ''}>Jaarlijks</option>
+            <option value="730" ${item?.frequency === 730 ? 'selected' : ''}>Tweejaarlijks</option>
+            <option value="1825" ${item?.frequency === 1825 ? 'selected' : ''}>Elke 5 jaar</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Toepasselijke norm / advies</label>
+        <input type="text" id="item-norm" placeholder="Bijv. NEN-EN 12845" value="${escapeHtml(item?.norm || '')}" />
+      </div>
+      <div class="field">
+        <label>Notities</label>
+        <textarea id="item-notes" rows="2" placeholder="Bijzonderheden, leverancier, etc.">${escapeHtml(item?.notes || '')}</textarea>
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="card-title"><span class="step">4</span> Melding</p>
+      <div class="row">
+        <div>
+          <label>Volgend onderhoud op</label>
+          <input type="date" id="item-next" value="${item?.nextDate || ''}" />
+        </div>
+        <div>
+          <label>Herinner ... dagen vooraf</label>
+          <input type="number" id="item-remind" value="${item?.remindDays || 14}" min="1" max="180" />
+        </div>
+      </div>
+    </div>
+
+    ${isEdit ? `
+      <button class="btn btn-primary" onclick="saveItem()">✓ Wijzigingen opslaan</button>
+      <div class="row-actions">
+        <button class="btn btn-secondary" onclick="markCompleted(${item.id})">✓ Uitgevoerd</button>
+        <button class="btn btn-danger" onclick="deleteItem(${item.id})">🗑 Verwijder</button>
+      </div>
+    ` : `
+      <button class="btn btn-primary" onclick="saveItem()">✓ Onderdeel opslaan</button>
+    `}
+  `;
+}
+
+function renderKlusForm(main) {
+  const isEdit = !!view.editKlusId;
+  currentKlus = isEdit
+    ? JSON.parse(JSON.stringify(klussen.find(k => k.id === view.editKlusId)))
+    : { id: null, locationId: view.locationId, title: '', description: '', status: 'open', prio: 'normaal', deadline: '', itemId: null, gereedschappen: [], bestellijst: [], werkelijkeKosten: '' };
+
+  if (!currentKlus.gereedschappen) currentKlus.gereedschappen = [];
+  if (!currentKlus.bestellijst) currentKlus.bestellijst = [];
+
+  const locItems = items.filter(i => i.locationId === view.locationId);
+  const linkOptions = `<option value="">— geen koppeling —</option>` + locItems.map(i =>
+    `<option value="${i.id}" ${currentKlus.itemId === i.id ? 'selected' : ''}>${escapeHtml(i.name)}${i.room ? ' (' + escapeHtml(i.room) + ')' : ''}</option>`
+  ).join('');
+
+  main.innerHTML = `
+    <div class="card">
+      <p class="card-title"><span class="step">1</span> Wat moet er gebeuren?</p>
+      <div class="field">
+        <label>Titel *</label>
+        <input type="text" id="klus-title" placeholder="Bijv. Sprinklerkoppen vervangen serverruimte" value="${escapeHtml(currentKlus.title)}" />
+      </div>
+      <div class="field">
+        <label>Beschrijving</label>
+        <textarea id="klus-desc" rows="3" placeholder="Wat moet er precies gedaan worden, hoe lang duurt het, etc.">${escapeHtml(currentKlus.description)}</textarea>
+      </div>
+      <div class="row">
+        <div>
+          <label>Status</label>
+          <select id="klus-status">
+            <option value="open" ${currentKlus.status === 'open' ? 'selected' : ''}>📋 Open</option>
+            <option value="bezig" ${currentKlus.status === 'bezig' ? 'selected' : ''}>🔧 Mee bezig</option>
+            <option value="klaar" ${currentKlus.status === 'klaar' ? 'selected' : ''}>✓ Klaar</option>
+          </select>
+        </div>
+        <div>
+          <label>Prioriteit</label>
+          <select id="klus-prio">
+            <option value="laag" ${currentKlus.prio === 'laag' ? 'selected' : ''}>Laag</option>
+            <option value="normaal" ${currentKlus.prio === 'normaal' ? 'selected' : ''}>Normaal</option>
+            <option value="hoog" ${currentKlus.prio === 'hoog' ? 'selected' : ''}>⚡ Hoog</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Deadline (optioneel)</label>
+          <input type="date" id="klus-deadline" value="${currentKlus.deadline || ''}" />
+        </div>
+        <div>
+          <label>Gekoppeld onderdeel (optioneel)</label>
+          <select id="klus-item">${linkOptions}</select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="card-title"><span class="step">2</span> 🧰 Gereedschappen</p>
+      <p style="font-size:12px;color:var(--text-muted);margin:0 0 10px;">Wat heb je nodig om deze klus te klaren? Vink af als je het hebt.</p>
+      <div id="tool-list"></div>
+      <button class="btn btn-secondary btn-small" style="margin-top:6px;" onclick="addTool()">+ Gereedschap toevoegen</button>
+    </div>
+
+    <div class="card">
+      <p class="card-title"><span class="step">3</span> 🛒 Bestellijst</p>
+      <p style="font-size:12px;color:var(--text-muted);margin:0 0 10px;">Wat moet je kopen? Kies leverancier en zoek de prijs op via 🔍 ${settings.aiEnabled && settings.geminiKey ? 'of laat AI een schatting maken via ✨' : ''}.</p>
+      <div id="order-list"></div>
+      <button class="btn btn-secondary btn-small" style="margin-top:6px;" onclick="addOrder()">+ Artikel toevoegen</button>
+      <div class="total-box">
+        <span class="total-label">Totale raming</span>
+        <span class="total-amount" id="total-amount">€ 0,00</span>
+      </div>
+      <div class="field" style="margin-top:12px;">
+        <label>Werkelijke kosten achteraf (optioneel)</label>
+        <input type="number" id="klus-werkelijk" step="0.01" placeholder="0,00" value="${currentKlus.werkelijkeKosten || ''}" />
+      </div>
+    </div>
+
+    ${isEdit ? `
+      <button class="btn btn-primary" onclick="saveKlus()">✓ Wijzigingen opslaan</button>
+      <div class="row-actions">
+        <button class="btn btn-secondary" onclick="markKlusKlaar()">✓ Klus afronden</button>
+        <button class="btn btn-danger" onclick="deleteKlus()">🗑 Verwijder</button>
+      </div>
+    ` : `
+      <button class="btn btn-primary" onclick="saveKlus()">✓ Klus opslaan</button>
+    `}
+  `;
+
+  renderTools();
+  renderOrders();
+}
+
+function renderTools() {
+  const div = document.getElementById('tool-list');
+  if (!div) return;
+  if (currentKlus.gereedschappen.length === 0) {
+    div.innerHTML = '<p style="font-size:12px;color:var(--text-muted);font-style:italic;">Nog geen gereedschap toegevoegd.</p>';
+    return;
+  }
+  div.innerHTML = currentKlus.gereedschappen.map((t, i) => `
+    <div class="tool-row">
+      <div class="check ${t.have ? 'checked' : ''}" onclick="toggleTool(${i})">${t.have ? '✓' : ''}</div>
+      <input type="text" value="${escapeHtml(t.name)}" placeholder="Bijv. Sleutel 17, ladder" oninput="updateTool(${i}, this.value)" />
+      <button class="del" onclick="removeTool(${i})">×</button>
+    </div>
+  `).join('');
+}
+
+function addTool() {
+  currentKlus.gereedschappen.push({ name: '', have: false });
+  renderTools();
+}
+function updateTool(i, val) { currentKlus.gereedschappen[i].name = val; }
+function toggleTool(i) { currentKlus.gereedschappen[i].have = !currentKlus.gereedschappen[i].have; renderTools(); }
+function removeTool(i) { currentKlus.gereedschappen.splice(i, 1); renderTools(); }
+
+function renderOrders() {
+  const div = document.getElementById('order-list');
+  if (!div) return;
+  if (currentKlus.bestellijst.length === 0) {
+    div.innerHTML = '<p style="font-size:12px;color:var(--text-muted);font-style:italic;">Nog geen artikelen toegevoegd.</p>';
+    updateTotal();
+    return;
+  }
+
+  const aiOn = settings.aiEnabled && settings.geminiKey;
+
+  div.innerHTML = currentKlus.bestellijst.map((o, i) => `
+    <div class="order-row">
+      <div class="order-line1">
+        <input class="name-input" type="text" value="${escapeHtml(o.naam || '')}" placeholder="Bijv. Sprinklerkop Viking VK102" oninput="updateOrder(${i}, 'naam', this.value)" />
+        <button class="del" onclick="removeOrder(${i})">×</button>
+      </div>
+      <div class="order-line2">
+        <input class="qty-input" type="number" min="1" value="${o.aantal || 1}" oninput="updateOrder(${i}, 'aantal', this.value)" title="Aantal" />
+        <select class="sup-select" onchange="updateOrder(${i}, 'leverancier', this.value)">
+          ${Object.entries(SUPPLIERS).map(([k,v]) => `<option value="${k}" ${o.leverancier === k ? 'selected' : ''}>${v.name}</option>`).join('')}
+        </select>
+        <input class="price-input" type="number" step="0.01" value="${o.prijs || ''}" placeholder="€ p/st" oninput="updateOrder(${i}, 'prijs', this.value)" title="Prijs per stuk" />
+      </div>
+      <div class="order-line2">
+        <button class="search-btn" onclick="searchSupplier(${i})">🔍 Zoek bij leverancier</button>
+        ${aiOn ? `<button class="ai-btn" onclick="estimatePriceAI(${i}, this)">✨ AI-schatting</button>` : ''}
+      </div>
+    </div>
+  `).join('');
+  updateTotal();
+}
+
+function addOrder() {
+  currentKlus.bestellijst.push({ naam: '', aantal: 1, leverancier: 'gamma', prijs: '' });
+  renderOrders();
+}
+function updateOrder(i, key, val) {
+  currentKlus.bestellijst[i][key] = val;
+  if (key === 'prijs' || key === 'aantal') updateTotal();
+}
+function removeOrder(i) { currentKlus.bestellijst.splice(i, 1); renderOrders(); }
+
+function searchSupplier(i) {
+  const o = currentKlus.bestellijst[i];
+  if (!o.naam) { alert('Vul eerst de naam van het artikel in.'); return; }
+  const sup = SUPPLIERS[o.leverancier || 'gamma'];
+  window.open(sup.url(o.naam), '_blank');
+}
+
+async function estimatePriceAI(i, btn) {
+  const o = currentKlus.bestellijst[i];
+  if (!o.naam) { alert('Vul eerst de naam van het artikel in.'); return; }
+
+  const sup = SUPPLIERS[o.leverancier || 'gamma']?.name || 'leverancier';
+  const oldText = btn.textContent;
+  btn.textContent = '...';
+  btn.disabled = true;
+
+  try {
+    const prompt = `Geef alleen een redelijke gemiddelde Nederlandse winkelprijs (in euro, alleen het getal met max 2 decimalen, bijvoorbeeld "24.95") voor: "${o.naam}" bij leverancier "${sup}". Als je het niet zeker weet, geef een redelijke schatting. Antwoord alleen met het getal, geen tekst, geen euro-teken, geen uitleg.`;
+    const text = await callGemini([{ text: prompt }]);
+    const match = text.match(/(\d+[.,]?\d*)/);
+    if (match) {
+      const price = parseFloat(match[1].replace(',', '.'));
+      currentKlus.bestellijst[i].prijs = price.toFixed(2);
+      renderOrders();
+    } else {
+      alert('Geen geldige prijs ontvangen. Antwoord: ' + text);
+    }
+  } catch (err) {
+    alert('AI-schatting mislukt: ' + err.message);
+  } finally {
+    btn.textContent = oldText;
+    btn.disabled = false;
+  }
+}
+
+function updateTotal() {
+  const total = currentKlus.bestellijst.reduce((s,o) =>
+    s + (parseFloat(o.prijs) || 0) * (parseInt(o.aantal) || 1), 0);
+  const el = document.getElementById('total-amount');
+  if (el) el.textContent = formatMoney(total);
+}
+
+function saveKlus() {
+  const title = document.getElementById('klus-title').value.trim();
+  if (!title) { alert('Geef de klus een titel.'); return; }
+
+  currentKlus.title = title;
+  currentKlus.description = document.getElementById('klus-desc').value.trim();
+  currentKlus.status = document.getElementById('klus-status').value;
+  currentKlus.prio = document.getElementById('klus-prio').value;
+  currentKlus.deadline = document.getElementById('klus-deadline').value;
+  const itemSel = document.getElementById('klus-item').value;
+  currentKlus.itemId = itemSel ? parseInt(itemSel) : null;
+  currentKlus.werkelijkeKosten = document.getElementById('klus-werkelijk').value;
+  currentKlus.gereedschappen = currentKlus.gereedschappen.filter(t => t.name.trim() !== '');
+  currentKlus.bestellijst = currentKlus.bestellijst.filter(o => (o.naam || '').trim() !== '');
+
+  if (view.editKlusId) {
+    const idx = klussen.findIndex(k => k.id === view.editKlusId);
+    if (idx >= 0) klussen[idx] = { ...currentKlus, id: view.editKlusId };
+  } else {
+    currentKlus.id = Date.now();
+    currentKlus.createdAt = new Date().toISOString();
+    klussen.push(currentKlus);
+  }
+
+  save();
+  view.locationTab = 'klussen';
+  goBack();
+}
+
+function markKlusKlaar() {
+  if (!confirm('Klus markeren als klaar?')) return;
+  const k = klussen.find(k => k.id === view.editKlusId);
+  if (k) { k.status = 'klaar'; k.completedAt = new Date().toISOString(); save(); }
+  view.locationTab = 'klussen';
+  goBack();
+}
+
+function deleteKlus() {
+  if (!confirm('Deze klus verwijderen?')) return;
+  klussen = klussen.filter(k => k.id !== view.editKlusId);
+  save();
+  view.locationTab = 'klussen';
+  goBack();
+}
+
+function editKlus(id) {
+  view = { ...view, screen: 'klus-form', editKlusId: id };
+  window.scrollTo(0, 0);
+  render();
+}
+
+// ============ SETTINGS ============
+function renderSettings(main) {
+  main.innerHTML = `
+    <div class="tabs">
+      <button class="tab" onclick="goTo('locations')">Locaties</button>
+      <button class="tab active" onclick="goTo('settings')">Instellingen</button>
+    </div>
+
+    <div class="card">
+      <p class="card-title">✨ AI-functies (Google Gemini)</p>
+      <p style="font-size: 13px; color: var(--text-muted); margin-top: 0;">Met AI kun je foto's automatisch laten herkennen en prijzen laten schatten. Gebruikt het gratis Gemini-tier van Google (geen creditcard nodig).</p>
+
+      <div class="success-banner">
+        <span>✓</span>
+        <div><strong>Gratis API-key in 3 stappen:</strong><br>
+        1. Ga naar <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a><br>
+        2. Log in met je Google-account<br>
+        3. Klik "Create API key" → kopieer 'm naar het veld hieronder
+        </div>
+      </div>
+
+      <div class="info-banner">
+        <span>ℹ️</span>
+        <div>Gratis tier: 10 verzoeken per minuut, 250 per dag. Ruim voldoende voor gewoon gebruik. Let op: Google kan je input gebruiken om hun AI te trainen, gebruik dus geen gevoelige bedrijfsinformatie.</div>
+      </div>
+
+      <div class="field">
+        <label>Gemini API-key</label>
+        <input type="password" id="api-key" placeholder="AIza..." value="${escapeHtml(settings.geminiKey)}" />
+      </div>
+      <div class="field">
+        <label>AI-functies aanzetten</label>
+        <div class="toggle-group" id="ai-toggle">
+          <button type="button" class="toggle-btn ${!settings.aiEnabled ? 'active' : ''}" onclick="setAiEnabled(false, this)">Uit</button>
+          <button type="button" class="toggle-btn ${settings.aiEnabled ? 'active' : ''}" onclick="setAiEnabled(true, this)">Aan</button>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="saveSettings()">Opslaan</button>
+      ${settings.geminiKey ? `<button class="btn btn-secondary" style="width:100%;margin-top:8px;" onclick="testGemini(this)">🧪 Test verbinding</button>` : ''}
+    </div>
+
+    <div class="card">
+      <p class="card-title">📧 Notificatie-ontvangers</p>
+      <p style="font-size: 13px; color: var(--text-muted); margin-top: 0;">E-mailadressen voor toekomstige meldingen.</p>
+      <div class="field">
+        <label>E-mailadres toevoegen</label>
+        <div style="display: flex; gap: 8px;">
+          <input type="email" id="new-email" placeholder="naam@voorbeeld.nl" />
+          <button class="btn btn-secondary" onclick="addEmail()">Toevoegen</button>
+        </div>
+      </div>
+      <div id="email-list"></div>
+    </div>
+
+    <div class="card">
+      <p class="card-title">💾 Data beheren</p>
+      <p style="font-size: 13px; color: var(--text-muted); margin-top: 0;">Je data staat lokaal in deze browser. Exporteer regelmatig als back-up.</p>
+      <div class="row">
+        <button class="btn btn-secondary" onclick="exportData()">⬇ Exporteer alles</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('import-input').click()">⬆ Importeer</button>
+      </div>
+      <input type="file" id="import-input" accept=".json" style="display:none" onchange="importData(event)" />
+      <button class="btn btn-danger" style="width: 100%; margin-top: 10px;" onclick="clearAll()">🗑 Alles wissen</button>
+    </div>
+
+    <div class="card">
+      <p class="card-title">ℹ️ Over</p>
+      <p style="font-size: 13px; color: var(--text-muted);">
+        Universele onderhoudsapp v0.4 – Met Gemini AI voor beeldherkenning en prijsschatting.
+      </p>
+      <p style="font-size: 12px; color: var(--text-muted);">
+        ${locations.length} locaties • ${items.length} onderdelen • ${klussen.length} klussen
+      </p>
+    </div>
+  `;
+  renderEmails();
+}
+
+function setAiEnabled(val, btn) {
+  settings.aiEnabled = val;
+  document.querySelectorAll('#ai-toggle .toggle-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function saveSettings() {
+  settings.geminiKey = document.getElementById('api-key').value.trim();
+  localStorage.setItem('settings', JSON.stringify(settings));
+  alert('Instellingen opgeslagen!');
+  render();
+}
+
+async function testGemini(btn) {
+  if (!settings.geminiKey) { alert('Eerst API-key invullen en opslaan.'); return; }
+  const oldText = btn.textContent;
+  btn.textContent = '... testen';
+  btn.disabled = true;
+  try {
+    const text = await callGemini([{ text: 'Antwoord met alleen het woord OK' }]);
+    if (text.toUpperCase().includes('OK')) {
+      alert('✓ Verbinding gelukt! Gemini reageert: "' + text.trim() + '"');
+    } else {
+      alert('Verbinding werkt, maar onverwacht antwoord: ' + text);
+    }
+  } catch (err) {
+    alert('❌ Test mislukt: ' + err.message);
+  } finally {
+    btn.textContent = oldText;
+    btn.disabled = false;
+  }
+}
+
+// ============ NAVIGATION ============
+function goTo(screen) {
+  view = { screen, locationId: null, locationTab: 'onderdelen', editItemId: null, editLocationId: null, editKlusId: null };
+  stopCamera();
+  window.scrollTo(0, 0);
+  render();
+}
+
+function goBack() {
+  if (view.screen === 'item-form' || view.screen === 'klus-form') {
+    view.screen = view.locationId ? 'location-detail' : 'locations';
+  } else if (view.screen === 'location-form') {
+    if (view.editLocationId) {
+      view.screen = 'location-detail';
+      view.locationId = view.editLocationId;
+    } else {
+      view.screen = 'locations';
+    }
+  }
+  view.editItemId = null;
+  view.editLocationId = null;
+  view.editKlusId = null;
+  stopCamera();
+  window.scrollTo(0, 0);
+  render();
+}
+
+function openLocation(id) {
+  view = { screen: 'location-detail', locationId: id, locationTab: 'onderdelen', editItemId: null, editLocationId: null, editKlusId: null };
+  window.scrollTo(0, 0);
+  render();
+}
+
+function editLocation(id) {
+  view = { screen: 'location-form', locationId: id, locationTab: view.locationTab, editItemId: null, editLocationId: id, editKlusId: null };
+  window.scrollTo(0, 0);
+  render();
+}
+
+function editItem(id) {
+  view = { ...view, screen: 'item-form', editItemId: id };
+  window.scrollTo(0, 0);
+  render();
+}
+
+function onFabClick() {
+  if (view.screen === 'locations') {
+    view = { screen: 'location-form', locationId: null, locationTab: 'onderdelen', editItemId: null, editLocationId: null, editKlusId: null };
+  } else if (view.screen === 'location-detail') {
+    if (locations.length === 0) { alert('Maak eerst een locatie aan.'); return; }
+    if (view.locationTab === 'klussen') {
+      view = { ...view, screen: 'klus-form', editKlusId: null };
+    } else {
+      view = { ...view, screen: 'item-form', editItemId: null };
+    }
+  }
+  window.scrollTo(0, 0);
+  render();
+}
+
+function toggleContext(btn) {
+  document.querySelectorAll('.toggle-btn[data-context]').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+// ============ SAVE LOCATIE / ITEM ============
+function saveLocation() {
+  const name = document.getElementById('loc-name').value.trim();
+  if (!name) { alert('Geef de locatie een naam.'); return; }
+  const address = document.getElementById('loc-address').value.trim();
+  const context = document.querySelector('.toggle-btn[data-context].active')?.dataset.context || 'zakelijk';
+  const country = document.getElementById('loc-country').value;
+
+  if (view.editLocationId) {
+    const loc = locations.find(l => l.id === view.editLocationId);
+    if (loc) { loc.name = name; loc.address = address; loc.context = context; loc.country = country; }
+    view.locationId = view.editLocationId;
+  } else {
+    const loc = { id: Date.now(), name, address, context, country, createdAt: new Date().toISOString() };
+    locations.push(loc);
+    view.locationId = loc.id;
+  }
+  save();
+  view.screen = 'location-detail';
+  view.editLocationId = null;
+  render();
+}
+
+function deleteLocation(id) {
+  const locItems = items.filter(i => i.locationId === id);
+  const locKlus = klussen.filter(k => k.locationId === id);
+  let msg = 'Deze locatie verwijderen?';
+  if (locItems.length > 0 || locKlus.length > 0) {
+    msg += `\n\nLet op: ${locItems.length} onderdelen en ${locKlus.length} klussen op deze locatie worden ook verwijderd!`;
+  }
+  if (!confirm(msg)) return;
+  locations = locations.filter(l => l.id !== id);
+  items = items.filter(i => i.locationId !== id);
+  klussen = klussen.filter(k => k.locationId !== id);
+  save();
+  goTo('locations');
+}
+
+function saveItem() {
+  const name = document.getElementById('item-name').value.trim();
+  const locationId = parseInt(document.getElementById('item-location').value);
+  if (!name) { alert('Geef het onderdeel een naam.'); return; }
+  if (!locationId) { alert('Kies een locatie.'); return; }
+
+  const data = {
+    locationId, name,
+    room: document.getElementById('item-room').value.trim(),
+    manufacturer: document.getElementById('item-manufacturer').value.trim(),
+    type: document.getElementById('item-type').value.trim(),
+    installed: document.getElementById('item-installed').value,
+    frequency: parseInt(document.getElementById('item-frequency').value),
+    norm: document.getElementById('item-norm').value.trim(),
+    notes: document.getElementById('item-notes').value.trim(),
+    nextDate: document.getElementById('item-next').value,
+    remindDays: parseInt(document.getElementById('item-remind').value) || 14,
+    photo: currentPhoto
+  };
+
+  if (view.editItemId) {
+    const item = items.find(i => i.id === view.editItemId);
+    if (item) Object.assign(item, data);
+  } else {
+    items.push({ id: Date.now(), ...data, createdAt: new Date().toISOString() });
+  }
+
+  save();
+  stopCamera();
+  view.screen = 'location-detail';
+  view.locationTab = 'onderdelen';
+  view.locationId = locationId;
+  view.editItemId = null;
+  render();
+}
+
+function deleteItem(id) {
+  if (!confirm('Dit onderdeel verwijderen?')) return;
+  items = items.filter(i => i.id !== id);
+  save();
+  goBack();
+}
+
+function markCompleted(id) {
+  const item = items.find(i => i.id === id);
+  if (!item) return;
+  if (!confirm('Onderhoud gemarkeerd als uitgevoerd vandaag? De volgende datum wordt automatisch berekend.')) return;
+  const next = new Date();
+  next.setDate(next.getDate() + (item.frequency || 365));
+  item.nextDate = next.toISOString().split('T')[0];
+  item.lastDone = new Date().toISOString().split('T')[0];
+  save();
+  goBack();
+}
+
+// ============ CAMERA ============
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    const video = document.getElementById('camera-video');
+    video.srcObject = stream;
+    video.classList.remove('hidden');
+    document.getElementById('camera-placeholder').classList.add('hidden');
+    document.getElementById('captured-img').classList.add('hidden');
+    document.getElementById('capture-btn').classList.remove('hidden');
+  } catch (err) {
+    alert('Camera kon niet starten: ' + err.message + '\n\nGebruik anders "Bibliotheek".');
+  }
+}
+
+function capturePhoto() {
+  const video = document.getElementById('camera-video');
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  currentPhoto = canvas.toDataURL('image/jpeg', 0.7);
+  showCapturedPhoto();
+  stopCamera();
+  analyzeImage();
+}
+
+function handleFileUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    currentPhoto = ev.target.result;
+    showCapturedPhoto();
+    analyzeImage();
+  };
+  reader.readAsDataURL(file);
+}
+
+function showCapturedPhoto() {
+  const img = document.getElementById('captured-img');
+  img.src = currentPhoto;
+  img.classList.remove('hidden');
+  document.getElementById('camera-placeholder').classList.add('hidden');
+  document.getElementById('camera-video').classList.add('hidden');
+  document.getElementById('capture-btn').classList.add('hidden');
+}
+
+function stopCamera() {
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+}
+
+async function analyzeImage() {
+  if (settings.aiEnabled && settings.geminiKey && currentPhoto) {
+    await analyzeImageGemini();
+  } else {
+    simulateAI();
+  }
+}
+
+async function analyzeImageGemini() {
+  const loadingDiv = document.getElementById('camera-loading');
+  loadingDiv?.classList.remove('hidden');
+
+  try {
+    const country = locations.find(l => l.id === view.locationId)?.country || 'NL';
+    const normLabel = { NL: 'Nederlandse NEN/NTA', BE: 'Belgische NBN', DE: 'Duitse DIN', EU: 'Europese EN/ISO' }[country] || '';
+
+    const prompt = `Je bekijkt een foto van een onderdeel dat onderhoud nodig heeft. Dit kan van alles zijn: een technische installatie (sprinklerkop, brandblusser, CV-ketel, ventilatie, rookmelder), tuingereedschap (heggenschaar, grasmaaier), gebouwonderdeel (cv-radiator, kozijn, dakgoot), of huishoudelijk apparaat.
+
+Geef het antwoord ALLEEN als geldig JSON, geen tekst eromheen, geen \`\`\`json blokken. Gebruik exact deze structuur:
+
+{
+  "naam": "korte beschrijving van het onderdeel in het Nederlands",
+  "fabrikant": "fabrikant als zichtbaar of waarschijnlijk, anders lege string",
+  "type": "model/type als zichtbaar of waarschijnlijk, anders lege string",
+  "frequentieDagen": 365,
+  "norm": "${normLabel ? `relevante ${normLabel}-norm als bekend (bijv. NEN-EN 12845, NEN 2559), anders lege string` : 'relevante norm als bekend, anders lege string'}",
+  "toelichting": "korte toelichting (1 zin) over wat het is en welk onderhoud nodig is"
+}
+
+Voor frequentieDagen kies één van: 30, 90, 180, 365, 730, 1825. Kies de meest gangbare onderhoudsfrequentie voor dit onderdeel volgens Nederlandse normen.`;
+
+    const text = await callGemini([
+      { text: prompt },
+      { inline_data: { mime_type: 'image/jpeg', data: dataUrlToBase64(currentPhoto) } }
+    ]);
+
+    // Parse JSON (verwijder eventuele markdown fences)
+    const cleaned = text.replace(/```json\s*|\s*```/g, '').trim();
+    let result;
+    try {
+      result = JSON.parse(cleaned);
+    } catch {
+      // Probeer JSON-object te extraheren
+      const m = cleaned.match(/\{[\s\S]*\}/);
+      if (m) result = JSON.parse(m[0]);
+      else throw new Error('Geen geldig JSON-antwoord ontvangen');
+    }
+
+    // Vul velden
+    const nameEl = document.getElementById('item-name');
+    const manufEl = document.getElementById('item-manufacturer');
+    const typeEl = document.getElementById('item-type');
+    const freqEl = document.getElementById('item-frequency');
+    const normEl = document.getElementById('item-norm');
+    const nextEl = document.getElementById('item-next');
+
+    if (result.naam && !nameEl.value) nameEl.value = result.naam;
+    if (result.fabrikant && !manufEl.value) manufEl.value = result.fabrikant;
+    if (result.type && !typeEl.value) typeEl.value = result.type;
+    if (result.norm && !normEl.value) normEl.value = result.norm;
+    if (result.frequentieDagen) freqEl.value = String(result.frequentieDagen);
+    if (!nextEl.value && result.frequentieDagen) {
+      const next = new Date();
+      next.setDate(next.getDate() + parseInt(result.frequentieDagen));
+      nextEl.value = next.toISOString().split('T')[0];
+    }
+
+    document.getElementById('ai-suggestion-text').textContent = result.toelichting || `Herkend als: ${result.naam}`;
+    document.getElementById('ai-result').classList.remove('hidden');
+
+  } catch (err) {
+    alert('AI-herkenning mislukt: ' + err.message + '\n\nVul de velden handmatig in.');
+    console.error(err);
+  } finally {
+    loadingDiv?.classList.add('hidden');
+  }
+}
+
+function simulateAI() {
+  const suggestions = [
+    { name: 'Sprinklerkop, glasbulb', manuf: 'Viking', type: 'VK102', freq: '365', norm: 'NEN-EN 12845' },
+    { name: 'CV-ketel', manuf: 'Vaillant', type: 'ecoTEC plus', freq: '365', norm: 'NEN 8025' },
+    { name: 'Rookmelder', manuf: 'Kidde', type: '10Y', freq: '365', norm: 'NEN 2535' },
+    { name: 'Heggenschaar', manuf: 'Bosch', type: 'AHS 50-16', freq: '180', norm: '—' },
+    { name: 'Brandblusser, poeder 6kg', manuf: 'Ajax', type: 'P6', freq: '365', norm: 'NEN 2559' },
+    { name: 'Ventilatie-unit (WTW)', manuf: 'Itho Daalderop', type: 'HRU ECO', freq: '180', norm: 'NEN 1087' },
+  ];
+  const pick = suggestions[Math.floor(Math.random() * suggestions.length)];
+  document.getElementById('ai-suggestion-text').textContent = `Voorbeeld (geen AI actief): "${pick.name}". Zet AI aan in Instellingen voor echte herkenning.`;
+  document.getElementById('ai-result').classList.remove('hidden');
+  if (!document.getElementById('item-name').value) document.getElementById('item-name').value = pick.name;
+  if (!document.getElementById('item-manufacturer').value) document.getElementById('item-manufacturer').value = pick.manuf;
+  if (!document.getElementById('item-type').value) document.getElementById('item-type').value = pick.type;
+  if (!document.getElementById('item-norm').value) document.getElementById('item-norm').value = pick.norm;
+  document.getElementById('item-frequency').value = pick.freq;
+  if (!document.getElementById('item-next').value) {
+    const next = new Date();
+    next.setDate(next.getDate() + parseInt(pick.freq));
+    document.getElementById('item-next').value = next.toISOString().split('T')[0];
+  }
+}
+
+// ============ EMAILS / DATA ============
+function addEmail() {
+  const input = document.getElementById('new-email');
+  const email = input.value.trim();
+  if (!email || !email.includes('@')) { alert('Geldig e-mailadres invullen.'); return; }
+  if (emails.includes(email)) { alert('Adres staat er al in.'); return; }
+  emails.push(email);
+  save();
+  input.value = '';
+  renderEmails();
+}
+
+function removeEmail(email) {
+  emails = emails.filter(e => e !== email);
+  save();
+  renderEmails();
+}
+
+function renderEmails() {
+  const div = document.getElementById('email-list');
+  if (!div) return;
+  if (emails.length === 0) {
+    div.innerHTML = '<p style="font-size:13px;color:var(--text-muted);">Nog geen e-mailadressen.</p>';
+    return;
+  }
+  div.innerHTML = emails.map(e =>
+    `<span class="email-tag">${escapeHtml(e)} <button onclick="removeEmail('${escapeHtml(e)}')">×</button></span>`
+  ).join('');
+}
+
+function exportData() {
+  const data = { locations, items, klussen, emails, exportedAt: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `onderhoudsapp-backup-${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importData(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      const lCount = data.locations?.length || 0;
+      const iCount = data.items?.length || 0;
+      const kCount = data.klussen?.length || 0;
+      if (!confirm(`Importeren?\n${lCount} locaties, ${iCount} onderdelen en ${kCount} klussen worden toegevoegd.`)) return;
+      if (data.locations) locations = locations.concat(data.locations);
+      if (data.items) items = items.concat(data.items);
+      if (data.klussen) klussen = klussen.concat(data.klussen);
+      if (data.emails) emails = [...new Set(emails.concat(data.emails))];
+      save();
+      render();
+      alert('Import gelukt!');
+    } catch (err) { alert('Bestand kon niet gelezen worden.'); }
+  };
+  reader.readAsText(file);
+}
+
+function clearAll() {
+  if (!confirm('ALLE data wissen? Dit kan niet ongedaan worden.')) return;
+  if (!confirm('Weet je het echt zeker?')) return;
+  locations = []; items = []; klussen = []; emails = [];
+  // Bewaar API-key en AI-instelling
+  const keep = { geminiKey: settings.geminiKey, aiEnabled: settings.aiEnabled };
+  localStorage.clear();
+  settings = keep;
+  localStorage.setItem('settings', JSON.stringify(settings));
+  goTo('locations');
+}
+
+function save() {
+  localStorage.setItem('locations', JSON.stringify(locations));
+  localStorage.setItem('items', JSON.stringify(items));
+  localStorage.setItem('klussen', JSON.stringify(klussen));
+  localStorage.setItem('emails', JSON.stringify(emails));
+  localStorage.setItem('settings', JSON.stringify(settings));
+}
+
+// ============ HELPERS ============
+function countryLabel(c) {
+  return { NL: '🇳🇱 NL', BE: '🇧🇪 BE', DE: '🇩🇪 DE', EU: '🇪🇺 EU', OTHER: '—' }[c] || '—';
+}
+
+function statusLabel(s) {
+  return { open: '📋 Open', bezig: '🔧 Bezig', klaar: '✓ Klaar' }[s] || s;
+}
+
+function formatMoney(n) {
+  return '€ ' + (Math.round(n * 100) / 100).toLocaleString('nl-NL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function formatDate(d) {
+  if (!d) return '';
+  const dt = new Date(d);
+  return dt.toLocaleDateString('nl-NL', { day: '2-digit', month: 'short' });
+}
+
+function escapeHtml(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+render();
+</script>
+
+</body>
+</html>
