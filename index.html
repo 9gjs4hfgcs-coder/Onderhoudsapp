@@ -430,6 +430,7 @@ let settings = JSON.parse(localStorage.getItem('settings') || '{}');
 if (settings.apiKey && !settings.geminiKey) settings.geminiKey = settings.apiKey;
 if (!settings.geminiKey) settings.geminiKey = '';
 if (settings.aiEnabled === undefined) settings.aiEnabled = false;
+if (!settings.aiMode) settings.aiMode = 'snel'; // 'snel' (geen Search) of 'uitgebreid' (met Search + bronnen)
 
 const GEMINI_MODEL = 'gemini-2.5-flash';
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
@@ -1685,6 +1686,19 @@ function renderSettings(main) {
           <button type="button" class="toggle-btn ${settings.aiEnabled ? 'active' : ''}" onclick="setAiEnabled(true, this)">Aan</button>
         </div>
       </div>
+
+      <div class="field">
+        <label>Beeldherkenning-modus</label>
+        <div class="toggle-group" id="ai-mode-toggle">
+          <button type="button" class="toggle-btn ${settings.aiMode !== 'uitgebreid' ? 'active' : ''}" onclick="setAiMode('snel', this)">⚡ Snel</button>
+          <button type="button" class="toggle-btn ${settings.aiMode === 'uitgebreid' ? 'active' : ''}" onclick="setAiMode('uitgebreid', this)">🔍 Uitgebreid + bronnen</button>
+        </div>
+        <p style="font-size:11px;color:var(--text-muted);margin-top:4px;">
+          <strong>Snel:</strong> 1 verzoek per scan, geen bronvermelding, ruim quotum.<br>
+          <strong>Uitgebreid:</strong> 2 verzoeken per scan + Google Search voor bronnen (NEN-normen, vakadviezen). Heeft strenger gratis-quotum.
+        </p>
+      </div>
+
       <button class="btn btn-primary" onclick="saveSettings()">Opslaan</button>
       ${settings.geminiKey ? `<button class="btn btn-secondary" style="width:100%;margin-top:8px;" onclick="testGemini(this)">🧪 Test verbinding</button>` : ''}
       ${settings.geminiKey ? `
@@ -1732,7 +1746,7 @@ function renderSettings(main) {
     <div class="card">
       <p class="card-title">ℹ️ Over</p>
       <p style="font-size: 13px; color: var(--text-muted);">
-        Universele onderhoudsapp v0.7 – Met Google Search-grounded AI voor onderbouwde onderhoudsadviezen.
+        Universele onderhoudsapp v0.7.1 – Met Snelle/Uitgebreide modus voor AI-beeldherkenning.
       </p>
       <p style="font-size: 12px; color: var(--text-muted);">
         ${locations.length} locaties (${locations.filter(l=>l.shareCode).length} gedeeld) • ${items.length} onderdelen • ${klussen.length} klussen • ${storingen.length} storingen
@@ -1751,6 +1765,12 @@ function saveUserName() {
 function setAiEnabled(val, btn) {
   settings.aiEnabled = val;
   document.querySelectorAll('#ai-toggle .toggle-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function setAiMode(mode, btn) {
+  settings.aiMode = mode;
+  document.querySelectorAll('#ai-mode-toggle .toggle-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
 }
 
@@ -2205,6 +2225,55 @@ function compressPhoto(dataUrl, maxWidth = 1024, quality = 0.6) {
 }
 
 async function analyzeImageGemini() {
+  if (settings.aiMode === 'uitgebreid') {
+    await analyzeImageWithSearch();
+  } else {
+    await analyzeImageQuick();
+  }
+}
+
+// === SNELLE MODUS: één call, geen Search, geen bronvermelding ===
+async function analyzeImageQuick() {
+  const loadingDiv = document.getElementById('camera-loading');
+  loadingDiv?.classList.remove('hidden');
+  if (loadingDiv) loadingDiv.textContent = '✨ AI analyseert foto...';
+
+  try {
+    const country = locations.find(l => l.id === view.locationId)?.country || 'NL';
+    const normLabel = { NL: 'Nederlandse NEN/NTA', BE: 'Belgische NBN', DE: 'Duitse DIN', EU: 'Europese EN/ISO' }[country] || 'Nederlandse NEN';
+
+    const prompt = `Je analyseert een foto van iets dat onderhoud kan vereisen. Dit kan van alles zijn: technische installaties (sprinklerkop, brandblusser, CV-ketel, ventilatie, rookmelder), tuingereedschap of tuinplanten (heggenschaar, grasmaaier, struik, boom, haag, fruitplant), gebouwonderdelen (radiator, kozijn, dakgoot), of huishoudelijke apparaten.
+
+Geef ALLEEN een JSON-object terug met deze velden:
+- naam (string): korte Nederlandse beschrijving
+- fabrikant (string): fabrikant indien zichtbaar, anders ""
+- type (string): model/type indien zichtbaar, anders ""
+- frequentieDagen (number): kies één van 30, 90, 180, 365, 730, of 1825 — gebruik je kennis van gangbare onderhoudsfrequenties
+- norm (string): relevante ${normLabel}-norm OF advies-bron (bv. "NEN 2559", "Tuinexpert-advies"), anders ""
+- toelichting (string): één zin over wat het is en welk onderhoud nodig is`;
+
+    const text = await callGemini([
+      { text: prompt },
+      { inline_data: { mime_type: 'image/jpeg', data: dataUrlToBase64(currentPhoto) } }
+    ], { jsonMode: true, maxTokens: 1024, thinkingBudget: 256 });
+
+    const result = extractJSON(text);
+    if (!result) throw new Error('Geen geldig JSON ontvangen. Antwoord:\n\n' + text.substring(0, 300));
+
+    fillFormFromResult(result);
+    window._currentSources = null;
+    showAiResult(result.toelichting || `Herkend als: ${result.naam || 'onbekend'}`, null);
+
+  } catch (err) {
+    console.error('AI-herkenning fout:', err);
+    alert('AI-herkenning mislukt: ' + err.message + '\n\nVul de velden handmatig in.');
+  } finally {
+    if (loadingDiv) loadingDiv.classList.add('hidden');
+  }
+}
+
+// === UITGEBREIDE MODUS: twee calls, met Google Search + bronvermelding ===
+async function analyzeImageWithSearch() {
   const loadingDiv = document.getElementById('camera-loading');
   loadingDiv?.classList.remove('hidden');
 
@@ -2212,7 +2281,6 @@ async function analyzeImageGemini() {
     const country = locations.find(l => l.id === view.locationId)?.country || 'NL';
     const normLabel = { NL: 'Nederlandse NEN/NTA', BE: 'Belgische NBN', DE: 'Duitse DIN', EU: 'Europese EN/ISO' }[country] || 'Nederlandse NEN';
 
-    // === STAP 1: Beeldherkenning + Google Search voor onderhoudsadvies ===
     if (loadingDiv) loadingDiv.textContent = '✨ AI bekijkt de foto en zoekt onderhoudsadvies...';
 
     const stap1Prompt = `Je analyseert een foto van iets dat onderhoud kan vereisen. Dit kan van alles zijn: technische installaties (sprinklerkop, brandblusser, CV-ketel, ventilatie, rookmelder), tuingereedschap of tuinplanten (heggenschaar, grasmaaier, struik, boom, haag), gebouwonderdelen (radiator, kozijn, dakgoot), of huishoudelijke apparaten.
@@ -2221,38 +2289,32 @@ Gebruik Google Search om actuele en betrouwbare informatie te vinden over het on
 
 Geef in het Nederlands antwoord met:
 1. Wat zie je op de foto? (naam, eventueel fabrikant/type)
-2. Wat is de aanbevolen onderhoudsfrequentie (in dagen of een gangbare term zoals 'jaarlijks')?
-3. Welke specifieke NEN/NEN-EN/DIN-norm of technisch bulletin is van toepassing, OF welke bron geeft dit advies (bv. "Velt", "Vereniging Hoveniers Nederland", fabrikant X)?
-4. Korte toelichting (1-2 zinnen) over wat het onderhoud inhoudt en wanneer het beste uitgevoerd wordt.
-
-Wees concreet en specifiek over de bron — als je het niet zeker weet, zeg dat dan ook eerlijk.`;
+2. Wat is de aanbevolen onderhoudsfrequentie?
+3. Welke specifieke norm of technisch bulletin is van toepassing, OF welke bron geeft dit advies?
+4. Korte toelichting (1-2 zinnen) over wat het onderhoud inhoudt en wanneer het beste uitgevoerd wordt.`;
 
     const stap1Result = await callGemini([
       { text: stap1Prompt },
       { inline_data: { mime_type: 'image/jpeg', data: dataUrlToBase64(currentPhoto) } }
     ], { useSearch: true, maxTokens: 1024, thinkingBudget: 256, returnMetadata: true });
 
-    const advisoryText = stap1Result.text;
-    const groundingMeta = stap1Result.groundingMetadata;
-
-    // === STAP 2: Zet advies om naar gestructureerde JSON ===
     if (loadingDiv) loadingDiv.textContent = '✨ Velden invullen...';
 
     const stap2Prompt = `Hier is een tekstuele beschrijving van een onderdeel met onderhoudsadvies:
 
 ---
-${advisoryText}
+${stap1Result.text}
 ---
 
 Zet dit om naar een JSON-object met EXACT deze velden:
-- naam (string): korte Nederlandse beschrijving van het onderdeel
-- fabrikant (string): fabrikant indien genoemd, anders ""
-- type (string): type/model indien genoemd, anders ""
-- frequentieDagen (number): kies één van 30, 90, 180, 365, 730, of 1825 (kies wat het dichtst bij het advies komt)
-- norm (string): de genoemde norm/bron zo letterlijk mogelijk (bv. "NEN-EN 12845", "Velt-advies snoeien", "Fabrikantenhandleiding")
-- toelichting (string): één zin met de kern van het advies, inclusief wanneer/hoe vaak
+- naam (string)
+- fabrikant (string): "" als niet genoemd
+- type (string): "" als niet genoemd
+- frequentieDagen (number): één van 30, 90, 180, 365, 730, 1825
+- norm (string): de genoemde norm/bron zo letterlijk mogelijk
+- toelichting (string): één zin met de kern van het advies
 
-Antwoord ALLEEN met het JSON-object, geen extra tekst.`;
+Antwoord ALLEEN met JSON.`;
 
     const jsonText = await callGemini(
       [{ text: stap2Prompt }],
@@ -2260,48 +2322,58 @@ Antwoord ALLEEN met het JSON-object, geen extra tekst.`;
     );
 
     const result = extractJSON(jsonText);
-    if (!result) {
-      throw new Error('Geen geldig JSON ontvangen. Antwoord:\n\n' + jsonText.substring(0, 300));
-    }
+    if (!result) throw new Error('Geen geldig JSON ontvangen. Antwoord:\n\n' + jsonText.substring(0, 300));
 
-    // Vul velden in
-    const nameEl = document.getElementById('item-name');
-    const manufEl = document.getElementById('item-manufacturer');
-    const typeEl = document.getElementById('item-type');
-    const freqEl = document.getElementById('item-frequency');
-    const normEl = document.getElementById('item-norm');
-    const nextEl = document.getElementById('item-next');
-
-    if (result.naam && !nameEl.value) nameEl.value = result.naam;
-    if (result.fabrikant && !manufEl.value) manufEl.value = result.fabrikant;
-    if (result.type && !typeEl.value) typeEl.value = result.type;
-    if (result.norm && !normEl.value) normEl.value = result.norm;
-    if (result.frequentieDagen) {
-      const valid = [30, 90, 180, 365, 730, 1825];
-      const closest = valid.reduce((p, c) =>
-        Math.abs(c - result.frequentieDagen) < Math.abs(p - result.frequentieDagen) ? c : p
-      );
-      freqEl.value = String(closest);
-      if (!nextEl.value) {
-        const next = new Date();
-        next.setDate(next.getDate() + closest);
-        nextEl.value = next.toISOString().split('T')[0];
-      }
-    }
-
-    // Bewaar de bronnen lokaal op het formulier zodat ze met opslaan meegaan
-    window._currentSources = extractSources(groundingMeta, advisoryText);
-
-    // Toon de bronvermelding
+    fillFormFromResult(result);
+    window._currentSources = extractSources(stap1Result.groundingMetadata, stap1Result.text);
     showAiResult(result.toelichting || `Herkend als: ${result.naam || 'onbekend'}`, window._currentSources);
 
   } catch (err) {
     console.error('AI-herkenning fout:', err);
-    alert('AI-herkenning mislukt: ' + err.message + '\n\nVul de velden handmatig in.');
+    // Bij 429 op uitgebreide modus: vriendelijke uitleg met optie om naar snel te schakelen
+    if (err.message.includes('quota') || err.message.includes('Quota')) {
+      const switchNow = confirm(err.message + '\n\nWil je tijdelijk overschakelen naar Snelle modus (zonder Google Search)? Die heeft een ruimer quotum.');
+      if (switchNow) {
+        settings.aiMode = 'snel';
+        save();
+        if (loadingDiv) loadingDiv.classList.add('hidden');
+        await analyzeImageQuick();
+        return;
+      }
+    } else {
+      alert('AI-herkenning mislukt: ' + err.message + '\n\nVul de velden handmatig in.');
+    }
   } finally {
     if (loadingDiv) {
       loadingDiv.textContent = '✨ AI analyseert foto...';
       loadingDiv.classList.add('hidden');
+    }
+  }
+}
+
+// Gedeelde helper om JSON-resultaat in formulier-velden te zetten
+function fillFormFromResult(result) {
+  const nameEl = document.getElementById('item-name');
+  const manufEl = document.getElementById('item-manufacturer');
+  const typeEl = document.getElementById('item-type');
+  const freqEl = document.getElementById('item-frequency');
+  const normEl = document.getElementById('item-norm');
+  const nextEl = document.getElementById('item-next');
+
+  if (result.naam && !nameEl.value) nameEl.value = result.naam;
+  if (result.fabrikant && !manufEl.value) manufEl.value = result.fabrikant;
+  if (result.type && !typeEl.value) typeEl.value = result.type;
+  if (result.norm && !normEl.value) normEl.value = result.norm;
+  if (result.frequentieDagen) {
+    const valid = [30, 90, 180, 365, 730, 1825];
+    const closest = valid.reduce((p, c) =>
+      Math.abs(c - result.frequentieDagen) < Math.abs(p - result.frequentieDagen) ? c : p
+    );
+    freqEl.value = String(closest);
+    if (!nextEl.value) {
+      const next = new Date();
+      next.setDate(next.getDate() + closest);
+      nextEl.value = next.toISOString().split('T')[0];
     }
   }
 }
