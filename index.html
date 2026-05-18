@@ -445,14 +445,21 @@ let stream = null;
 let currentKlus = null;
 
 // ============ GEMINI HELPERS ============
-async function callGemini(parts) {
+async function callGemini(parts, options = {}) {
   if (!settings.geminiKey) throw new Error('Geen Gemini API-key ingesteld. Ga naar Instellingen.');
+  const generationConfig = {
+    temperature: 0.2,
+    maxOutputTokens: options.maxTokens || 1500
+  };
+  if (options.jsonMode) {
+    generationConfig.responseMimeType = 'application/json';
+  }
   const res = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(settings.geminiKey)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{ parts }],
-      generationConfig: { temperature: 0.2, maxOutputTokens: 500 }
+      generationConfig
     })
   });
   if (!res.ok) {
@@ -464,7 +471,42 @@ async function callGemini(parts) {
     throw new Error(errMsg);
   }
   const data = await res.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  // Check voor blokkades en lege antwoorden
+  if (data.promptFeedback?.blockReason) {
+    throw new Error('Aanvraag geblokkeerd: ' + data.promptFeedback.blockReason);
+  }
+  const candidate = data.candidates?.[0];
+  if (!candidate) {
+    throw new Error('Leeg antwoord van Gemini: ' + JSON.stringify(data).substring(0, 200));
+  }
+  if (candidate.finishReason && candidate.finishReason !== 'STOP' && candidate.finishReason !== 'MAX_TOKENS') {
+    throw new Error('Antwoord onderbroken: ' + candidate.finishReason);
+  }
+  const text = candidate.content?.parts?.map(p => p.text || '').join('') || '';
+  if (!text) throw new Error('Geen tekst in antwoord (finishReason: ' + (candidate.finishReason || 'onbekend') + ')');
+  return text;
+}
+
+// Tolerante JSON-parser: probeert meerdere manieren om JSON eruit te halen
+function extractJSON(text) {
+  if (!text) return null;
+  // Verwijder markdown code fences
+  let cleaned = text.replace(/```(?:json)?\s*/gi, '').replace(/```\s*$/g, '').trim();
+  // Direct parsen
+  try { return JSON.parse(cleaned); } catch {}
+  // Eerste { tot laatste }
+  const first = cleaned.indexOf('{');
+  const last = cleaned.lastIndexOf('}');
+  if (first >= 0 && last > first) {
+    const candidate = cleaned.substring(first, last + 1);
+    try { return JSON.parse(candidate); } catch {}
+  }
+  // Met regex voor genest object
+  const m = cleaned.match(/\{[\s\S]*\}/);
+  if (m) {
+    try { return JSON.parse(m[0]); } catch {}
+  }
+  return null;
 }
 
 function dataUrlToBase64(dataUrl) {
@@ -1416,38 +1458,28 @@ async function analyzeImageGemini() {
 
   try {
     const country = locations.find(l => l.id === view.locationId)?.country || 'NL';
-    const normLabel = { NL: 'Nederlandse NEN/NTA', BE: 'Belgische NBN', DE: 'Duitse DIN', EU: 'Europese EN/ISO' }[country] || '';
+    const normLabel = { NL: 'Nederlandse NEN/NTA', BE: 'Belgische NBN', DE: 'Duitse DIN', EU: 'Europese EN/ISO' }[country] || 'Nederlandse NEN';
 
-    const prompt = `Je bekijkt een foto van een onderdeel dat onderhoud nodig heeft. Dit kan van alles zijn: een technische installatie (sprinklerkop, brandblusser, CV-ketel, ventilatie, rookmelder), tuingereedschap (heggenschaar, grasmaaier), gebouwonderdeel (cv-radiator, kozijn, dakgoot), of huishoudelijk apparaat.
+    const prompt = `Je analyseert een foto van iets dat onderhoud kan vereisen. Dit kan van alles zijn: technische installaties (sprinklerkop, brandblusser, CV-ketel, ventilatie, rookmelder), tuingereedschap of tuinplanten (heggenschaar, grasmaaier, struik, boom, haag), gebouwonderdelen (radiator, kozijn, dakgoot), of huishoudelijke apparaten.
 
-Geef het antwoord ALLEEN als geldig JSON, geen tekst eromheen, geen \`\`\`json blokken. Gebruik exact deze structuur:
+Geef ALLEEN een JSON-object terug met deze velden:
+- naam (string): korte Nederlandse beschrijving van wat je ziet
+- fabrikant (string): fabrikant indien zichtbaar, anders ""
+- type (string): model/type indien zichtbaar, anders ""
+- frequentieDagen (number): kies één van 30, 90, 180, 365, 730, of 1825
+- norm (string): relevante ${normLabel}-norm indien van toepassing, anders ""
+- toelichting (string): één zin over wat het is en welk onderhoud nodig is
 
-{
-  "naam": "korte beschrijving van het onderdeel in het Nederlands",
-  "fabrikant": "fabrikant als zichtbaar of waarschijnlijk, anders lege string",
-  "type": "model/type als zichtbaar of waarschijnlijk, anders lege string",
-  "frequentieDagen": 365,
-  "norm": "${normLabel ? `relevante ${normLabel}-norm als bekend (bijv. NEN-EN 12845, NEN 2559), anders lege string` : 'relevante norm als bekend, anders lege string'}",
-  "toelichting": "korte toelichting (1 zin) over wat het is en welk onderhoud nodig is"
-}
-
-Voor frequentieDagen kies één van: 30, 90, 180, 365, 730, 1825. Kies de meest gangbare onderhoudsfrequentie voor dit onderdeel volgens Nederlandse normen.`;
+Voor tuinplanten/struiken: gebruik frequentie 180 (halfjaarlijks snoeien) of 365 (jaarlijks). Voor technische installaties meestal 365. Voor brandbeveiliging 365 (jaarlijkse keuring).`;
 
     const text = await callGemini([
       { text: prompt },
       { inline_data: { mime_type: 'image/jpeg', data: dataUrlToBase64(currentPhoto) } }
-    ]);
+    ], { jsonMode: true, maxTokens: 800 });
 
-    // Parse JSON (verwijder eventuele markdown fences)
-    const cleaned = text.replace(/```json\s*|\s*```/g, '').trim();
-    let result;
-    try {
-      result = JSON.parse(cleaned);
-    } catch {
-      // Probeer JSON-object te extraheren
-      const m = cleaned.match(/\{[\s\S]*\}/);
-      if (m) result = JSON.parse(m[0]);
-      else throw new Error('Geen geldig JSON-antwoord ontvangen');
+    const result = extractJSON(text);
+    if (!result) {
+      throw new Error('Geen geldig JSON ontvangen. Antwoord van AI:\n\n' + text.substring(0, 300));
     }
 
     // Vul velden
@@ -1462,19 +1494,26 @@ Voor frequentieDagen kies één van: 30, 90, 180, 365, 730, 1825. Kies de meest 
     if (result.fabrikant && !manufEl.value) manufEl.value = result.fabrikant;
     if (result.type && !typeEl.value) typeEl.value = result.type;
     if (result.norm && !normEl.value) normEl.value = result.norm;
-    if (result.frequentieDagen) freqEl.value = String(result.frequentieDagen);
-    if (!nextEl.value && result.frequentieDagen) {
-      const next = new Date();
-      next.setDate(next.getDate() + parseInt(result.frequentieDagen));
-      nextEl.value = next.toISOString().split('T')[0];
+    if (result.frequentieDagen) {
+      // Snap naar dichtstbijzijnde geldige optie
+      const valid = [30, 90, 180, 365, 730, 1825];
+      const closest = valid.reduce((p, c) =>
+        Math.abs(c - result.frequentieDagen) < Math.abs(p - result.frequentieDagen) ? c : p
+      );
+      freqEl.value = String(closest);
+      if (!nextEl.value) {
+        const next = new Date();
+        next.setDate(next.getDate() + closest);
+        nextEl.value = next.toISOString().split('T')[0];
+      }
     }
 
-    document.getElementById('ai-suggestion-text').textContent = result.toelichting || `Herkend als: ${result.naam}`;
+    document.getElementById('ai-suggestion-text').textContent = result.toelichting || `Herkend als: ${result.naam || 'onbekend'}`;
     document.getElementById('ai-result').classList.remove('hidden');
 
   } catch (err) {
+    console.error('AI-herkenning fout:', err);
     alert('AI-herkenning mislukt: ' + err.message + '\n\nVul de velden handmatig in.');
-    console.error(err);
   } finally {
     loadingDiv?.classList.add('hidden');
   }
