@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="theme-color" content="#0c4a6e" />
-<title>Aqua+ Onderhoudsapp – Prototype</title>
+<title>Aqua+ Onderhoudsapp</title>
 <style>
   :root {
     --bg: #f5f7fa;
@@ -29,20 +29,31 @@
     background: var(--bg);
     color: var(--text);
     line-height: 1.5;
+    padding-bottom: 80px;
   }
   header {
     background: var(--primary);
     color: white;
-    padding: 16px 20px;
+    padding: 14px 16px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     position: sticky;
     top: 0;
     z-index: 10;
+    gap: 8px;
   }
-  header h1 { margin: 0; font-size: 18px; font-weight: 600; }
-  header .subtitle { font-size: 12px; opacity: 0.85; }
+  header h1 { margin: 0; font-size: 17px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  header .back-btn {
+    background: rgba(255,255,255,0.15);
+    border: none;
+    color: white;
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
   main { max-width: 720px; margin: 0 auto; padding: 16px; }
 
   .tabs {
@@ -64,26 +75,17 @@
     color: var(--text-muted);
     cursor: pointer;
     border-radius: 8px;
-    transition: all 0.15s;
   }
   .tab.active {
     background: var(--primary);
     color: white;
-  }
-  .tab .badge {
-    background: var(--danger);
-    color: white;
-    font-size: 11px;
-    padding: 1px 6px;
-    border-radius: 10px;
-    margin-left: 4px;
   }
 
   .card {
     background: var(--surface);
     border-radius: var(--radius);
     border: 1px solid var(--border);
-    padding: 16px;
+    padding: 14px 16px;
     margin-bottom: 12px;
   }
   .card-title {
@@ -126,7 +128,6 @@
     box-shadow: 0 0 0 3px rgba(12, 74, 110, 0.1);
   }
   .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-  .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
   .field { margin-bottom: 10px; }
 
   .toggle-group {
@@ -166,7 +167,6 @@
     gap: 6px;
   }
   .btn-primary { background: var(--primary); color: white; width: 100%; }
-  .btn-primary:hover { opacity: 0.9; }
   .btn-secondary { background: var(--bg); color: var(--text); border: 1px solid var(--border); }
   .btn-danger { background: var(--danger-light); color: var(--danger); }
 
@@ -203,20 +203,59 @@
   }
   .ai-result strong { color: var(--success); }
 
-  .item-list { list-style: none; padding: 0; margin: 0; }
-  .item {
+  .loc-card {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 14px;
     margin-bottom: 10px;
+    cursor: pointer;
     display: flex;
     align-items: center;
     gap: 12px;
   }
+  .loc-card:active { background: var(--bg); }
+  .loc-icon {
+    width: 44px;
+    height: 44px;
+    background: var(--primary-light);
+    color: var(--primary);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+  .loc-body { flex: 1; min-width: 0; }
+  .loc-name { font-weight: 600; font-size: 15px; margin-bottom: 2px; }
+  .loc-meta { font-size: 12px; color: var(--text-muted); }
+  .loc-count {
+    background: var(--bg);
+    color: var(--text-muted);
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .loc-count.warning { background: var(--warning-light); color: var(--warning); }
+  .loc-count.danger { background: var(--danger-light); color: var(--danger); }
+
+  .item-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+  }
+  .item-card:active { background: var(--bg); }
   .item-icon {
-    width: 40px;
-    height: 40px;
+    width: 50px;
+    height: 50px;
     background: var(--primary-light);
     color: var(--primary);
     border-radius: 8px;
@@ -225,12 +264,14 @@
     justify-content: center;
     flex-shrink: 0;
     font-size: 20px;
+    overflow: hidden;
   }
+  .item-icon img { width: 100%; height: 100%; object-fit: cover; }
   .item-body { flex: 1; min-width: 0; }
   .item-name { font-weight: 600; font-size: 14px; margin-bottom: 2px; }
   .item-meta { font-size: 12px; color: var(--text-muted); }
   .item-due {
-    font-size: 12px;
+    font-size: 11px;
     padding: 4px 8px;
     border-radius: 6px;
     font-weight: 600;
@@ -245,43 +286,7 @@
     padding: 40px 20px;
     color: var(--text-muted);
   }
-  .empty svg { width: 56px; height: 56px; opacity: 0.4; margin-bottom: 12px; }
 
-  .modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.5);
-    display: none;
-    align-items: flex-end;
-    justify-content: center;
-    z-index: 100;
-  }
-  .modal-overlay.active { display: flex; }
-  .modal {
-    background: var(--surface);
-    border-radius: 16px 16px 0 0;
-    width: 100%;
-    max-width: 720px;
-    max-height: 90vh;
-    overflow-y: auto;
-    padding: 20px;
-  }
-  @media (min-width: 600px) {
-    .modal-overlay { align-items: center; }
-    .modal { border-radius: 16px; }
-  }
-
-  .info-banner {
-    background: var(--primary-light);
-    color: var(--primary);
-    padding: 10px 12px;
-    border-radius: 8px;
-    font-size: 12px;
-    margin-bottom: 12px;
-    display: flex;
-    gap: 8px;
-    align-items: flex-start;
-  }
   .hidden { display: none !important; }
 
   .email-tag {
@@ -302,160 +307,388 @@
     cursor: pointer;
     padding: 0;
     font-size: 14px;
-    line-height: 1;
   }
+
+  .fab {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: var(--primary);
+    color: white;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    border: none;
+    font-size: 28px;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 50;
+  }
+
+  .screen-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0 0 14px;
+  }
+  .ctx-tag {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    margin-left: 6px;
+  }
+  .ctx-zakelijk { background: var(--primary-light); color: var(--primary); }
+  .ctx-prive { background: #fef3c7; color: #92400e; }
+
+  .row-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .row-actions .btn { flex: 1; }
 </style>
 </head>
 <body>
 
 <header>
-  <div>
-    <h1>🔧 Onderhoudsapp</h1>
-    <div class="subtitle">Prototype – data blijft op je apparaat</div>
-  </div>
-  <button class="btn btn-secondary" onclick="exportData()" style="padding: 6px 10px; font-size: 12px;">⬇ Export</button>
+  <h1 id="header-title">🔧 Onderhoudsapp</h1>
+  <button style="color:white;background:rgba(255,255,255,0.15);border:none;padding:6px 10px;border-radius:8px;font-size:12px;cursor:pointer;" onclick="exportData()">⬇</button>
 </header>
 
-<main>
-  <div class="tabs">
-    <button class="tab active" data-tab="overview">Overzicht <span id="badge-overdue" class="badge hidden">0</span></button>
-    <button class="tab" data-tab="add">+ Toevoegen</button>
-    <button class="tab" data-tab="settings">Instellingen</button>
-  </div>
+<main id="main"></main>
 
-  <!-- OVERVIEW TAB -->
-  <div id="tab-overview" class="tab-content">
-    <div id="item-list"></div>
-  </div>
+<button id="fab" class="fab hidden" onclick="onFabClick()">+</button>
 
-  <!-- ADD TAB -->
-  <div id="tab-add" class="tab-content hidden">
+<script>
+let locations = JSON.parse(localStorage.getItem('locations') || '[]');
+let items = JSON.parse(localStorage.getItem('items') || '[]');
+let emails = JSON.parse(localStorage.getItem('emails') || '[]');
 
+// Migration from v1
+const oldItems = items.filter(i => i.address && !i.locationId);
+if (oldItems.length > 0) {
+  const grouped = {};
+  oldItems.forEach(i => {
+    const key = (i.address || '') + '|' + (i.context || 'zakelijk') + '|' + (i.country || 'NL');
+    if (!grouped[key]) {
+      const loc = {
+        id: Date.now() + Math.random(),
+        name: i.address,
+        address: i.address,
+        context: i.context || 'zakelijk',
+        country: i.country || 'NL',
+        createdAt: new Date().toISOString()
+      };
+      grouped[key] = loc;
+      locations.push(loc);
+    }
+    i.locationId = grouped[key].id;
+    delete i.address;
+    delete i.context;
+    delete i.country;
+  });
+  save();
+}
+
+let view = { screen: 'locations', locationId: null, editItemId: null, editLocationId: null };
+let currentPhoto = null;
+let stream = null;
+
+function render() {
+  const main = document.getElementById('main');
+  const headerTitle = document.getElementById('header-title');
+  const fab = document.getElementById('fab');
+
+  if (view.screen === 'locations') {
+    headerTitle.innerHTML = '🔧 Locaties';
+    fab.classList.remove('hidden');
+    renderLocations(main);
+  } else if (view.screen === 'location-detail') {
+    const loc = locations.find(l => l.id === view.locationId);
+    headerTitle.innerHTML = `<button class="back-btn" onclick="goTo('locations')">←</button> ${escapeHtml(loc?.name || '')}`;
+    fab.classList.remove('hidden');
+    renderLocationDetail(main, loc);
+  } else if (view.screen === 'location-form') {
+    headerTitle.innerHTML = `<button class="back-btn" onclick="goBack()">←</button> ${view.editLocationId ? 'Locatie bewerken' : 'Nieuwe locatie'}`;
+    fab.classList.add('hidden');
+    renderLocationForm(main);
+  } else if (view.screen === 'item-form') {
+    headerTitle.innerHTML = `<button class="back-btn" onclick="goBack()">←</button> ${view.editItemId ? 'Onderdeel bewerken' : 'Nieuw onderdeel'}`;
+    fab.classList.add('hidden');
+    renderItemForm(main);
+  } else if (view.screen === 'settings') {
+    headerTitle.innerHTML = '⚙️ Instellingen';
+    fab.classList.add('hidden');
+    renderSettings(main);
+  }
+}
+
+function renderLocations(main) {
+  main.innerHTML = `
+    <div class="tabs">
+      <button class="tab active" onclick="goTo('locations')">Locaties</button>
+      <button class="tab" onclick="goTo('settings')">Instellingen</button>
+    </div>
+    <div id="loc-list"></div>
+  `;
+  const list = document.getElementById('loc-list');
+
+  if (locations.length === 0) {
+    list.innerHTML = `
+      <div class="empty">
+        <div style="font-size:48px;">📍</div>
+        <p><strong>Nog geen locaties</strong></p>
+        <p>Tik op de + knop om je eerste locatie toe te voegen.</p>
+      </div>`;
+    return;
+  }
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  list.innerHTML = locations.map(loc => {
+    const locItems = items.filter(i => i.locationId === loc.id);
+    let overdue = 0, soon = 0;
+    locItems.forEach(i => {
+      const due = new Date(i.nextDate);
+      const daysLeft = Math.floor((due - today) / (1000*60*60*24));
+      if (daysLeft < 0) overdue++;
+      else if (daysLeft <= (i.remindDays || 14)) soon++;
+    });
+    const countClass = overdue > 0 ? 'danger' : (soon > 0 ? 'warning' : '');
+    const countText = overdue > 0 ? `${overdue} over tijd` : (soon > 0 ? `${soon} binnenkort` : `${locItems.length}`);
+    const ctxTag = `<span class="ctx-tag ctx-${loc.context}">${loc.context === 'zakelijk' ? 'Zakelijk' : 'Privé'}</span>`;
+    return `
+      <div class="loc-card" onclick="openLocation(${loc.id})">
+        <div class="loc-icon">${loc.context === 'zakelijk' ? '🏢' : '🏠'}</div>
+        <div class="loc-body">
+          <div class="loc-name">${escapeHtml(loc.name)}${ctxTag}</div>
+          <div class="loc-meta">${escapeHtml(loc.address || '')}</div>
+        </div>
+        <div class="loc-count ${countClass}">${countText}</div>
+      </div>`;
+  }).join('');
+}
+
+function renderLocationDetail(main, loc) {
+  if (!loc) { goTo('locations'); return; }
+  const locItems = items.filter(i => i.locationId === loc.id);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const sorted = [...locItems].sort((a,b) => new Date(a.nextDate) - new Date(b.nextDate));
+
+  main.innerHTML = `
     <div class="card">
-      <p class="card-title"><span class="step">Stap 1</span> Locatie & context</p>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+        <div>
+          <p style="margin:0 0 4px;font-size:12px;color:var(--text-muted);">${loc.context === 'zakelijk' ? 'Zakelijk' : 'Privé'} • ${countryLabel(loc.country)}</p>
+          <p style="margin:0;font-size:13px;">${escapeHtml(loc.address || '—')}</p>
+        </div>
+        <button class="btn btn-secondary" style="padding:6px 10px;font-size:12px;" onclick="editLocation(${loc.id})">Bewerken</button>
+      </div>
+    </div>
+    <h2 class="screen-title" style="margin-top:18px;">Onderdelen (${locItems.length})</h2>
+    <div id="item-list"></div>
+  `;
+
+  const list = document.getElementById('item-list');
+  if (locItems.length === 0) {
+    list.innerHTML = `
+      <div class="empty">
+        <div style="font-size:48px;">📦</div>
+        <p><strong>Nog geen onderdelen</strong></p>
+        <p>Tik op + om er een toe te voegen.</p>
+      </div>`;
+    return;
+  }
+
+  list.innerHTML = sorted.map(item => {
+    const due = new Date(item.nextDate);
+    const daysLeft = Math.floor((due - today) / (1000*60*60*24));
+    let dueClass = 'due-ok', dueText = `over ${daysLeft} dgn`;
+    if (daysLeft < 0) { dueClass = 'due-overdue'; dueText = `${-daysLeft} dgn over tijd`; }
+    else if (daysLeft <= (item.remindDays || 14)) { dueClass = 'due-soon'; dueText = `binnen ${daysLeft} dgn`; }
+
+    const icon = item.photo ? `<img src="${item.photo}" alt="" />` : '🔧';
+
+    return `
+      <div class="item-card" onclick="editItem(${item.id})">
+        <div class="item-icon">${icon}</div>
+        <div class="item-body">
+          <div class="item-name">${escapeHtml(item.name)}</div>
+          <div class="item-meta">${item.room ? escapeHtml(item.room) + ' • ' : ''}${escapeHtml(item.manufacturer || '')} ${escapeHtml(item.type || '')}</div>
+          ${item.norm ? `<div class="item-meta">${escapeHtml(item.norm)}</div>` : ''}
+        </div>
+        <span class="item-due ${dueClass}">${dueText}</span>
+      </div>`;
+  }).join('');
+}
+
+function renderLocationForm(main) {
+  const isEdit = !!view.editLocationId;
+  const loc = isEdit ? locations.find(l => l.id === view.editLocationId) : null;
+
+  main.innerHTML = `
+    <div class="card">
+      <p class="card-title">Locatiegegevens</p>
       <div class="field">
-        <label>Locatie / adres</label>
-        <input type="text" id="loc-address" placeholder="Bijv. Kantoor Groningen, Zonneweg 12" />
+        <label>Naam locatie *</label>
+        <input type="text" id="loc-name" placeholder="Bijv. Kantoor Groningen, Thuis, Pand Janssen" value="${escapeHtml(loc?.name || '')}" />
       </div>
       <div class="field">
-        <label>Ruimte / specifieke plek (optioneel)</label>
-        <input type="text" id="loc-room" placeholder="Bijv. Serverruimte, Achtertuin" />
+        <label>Adres (optioneel)</label>
+        <input type="text" id="loc-address" placeholder="Zonneweg 12, Groningen" value="${escapeHtml(loc?.address || '')}" />
       </div>
       <div class="row">
         <div>
           <label>Type gebruik</label>
           <div class="toggle-group">
-            <button type="button" class="toggle-btn active" data-context="zakelijk">Zakelijk</button>
-            <button type="button" class="toggle-btn" data-context="prive">Privé</button>
+            <button type="button" class="toggle-btn ${(loc?.context || 'zakelijk') === 'zakelijk' ? 'active' : ''}" data-context="zakelijk" onclick="toggleContext(this)">Zakelijk</button>
+            <button type="button" class="toggle-btn ${loc?.context === 'prive' ? 'active' : ''}" data-context="prive" onclick="toggleContext(this)">Privé</button>
           </div>
         </div>
         <div>
           <label>Land / norm</label>
-          <select id="country">
-            <option value="NL">🇳🇱 Nederland (NEN/NTA)</option>
-            <option value="BE">🇧🇪 België (NBN)</option>
-            <option value="DE">🇩🇪 Duitsland (DIN)</option>
-            <option value="EU">🇪🇺 Europees (EN/ISO)</option>
-            <option value="OTHER">Anders / geen</option>
+          <select id="loc-country">
+            <option value="NL" ${(loc?.country || 'NL') === 'NL' ? 'selected' : ''}>🇳🇱 Nederland (NEN/NTA)</option>
+            <option value="BE" ${loc?.country === 'BE' ? 'selected' : ''}>🇧🇪 België (NBN)</option>
+            <option value="DE" ${loc?.country === 'DE' ? 'selected' : ''}>🇩🇪 Duitsland (DIN)</option>
+            <option value="EU" ${loc?.country === 'EU' ? 'selected' : ''}>🇪🇺 Europees (EN/ISO)</option>
+            <option value="OTHER" ${loc?.country === 'OTHER' ? 'selected' : ''}>Anders / geen</option>
           </select>
         </div>
       </div>
     </div>
+    ${isEdit ? `
+      <button class="btn btn-primary" onclick="saveLocation()">✓ Wijzigingen opslaan</button>
+      <div class="row-actions">
+        <button class="btn btn-danger" onclick="deleteLocation(${loc.id})">🗑 Locatie verwijderen</button>
+      </div>
+    ` : `
+      <button class="btn btn-primary" onclick="saveLocation()">✓ Locatie aanmaken</button>
+    `}
+  `;
+}
+
+function renderItemForm(main) {
+  const isEdit = !!view.editItemId;
+  const item = isEdit ? items.find(i => i.id === view.editItemId) : null;
+  currentPhoto = item?.photo || null;
+
+  const locOptions = locations.map(l =>
+    `<option value="${l.id}" ${(item?.locationId || view.locationId) === l.id ? 'selected' : ''}>${escapeHtml(l.name)}</option>`
+  ).join('');
+
+  main.innerHTML = `
+    <div class="card">
+      <p class="card-title"><span class="step">1</span> Locatie</p>
+      <div class="field">
+        <label>Op welke locatie?</label>
+        <select id="item-location">${locOptions}</select>
+      </div>
+      <div class="field">
+        <label>Ruimte / specifieke plek (optioneel)</label>
+        <input type="text" id="item-room" placeholder="Bijv. Serverruimte, Achtertuin, Kelder" value="${escapeHtml(item?.room || '')}" />
+      </div>
+    </div>
 
     <div class="card">
-      <p class="card-title"><span class="step">Stap 2</span> Scan onderdeel</p>
+      <p class="card-title"><span class="step">2</span> Scan onderdeel</p>
       <div class="camera-box" id="camera-box">
-        <div class="camera-placeholder" id="camera-placeholder">
+        <div class="camera-placeholder ${currentPhoto ? 'hidden' : ''}" id="camera-placeholder">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-          <div>Geen foto geselecteerd</div>
+          <div>Geen foto</div>
         </div>
         <video id="camera-video" autoplay playsinline class="hidden"></video>
-        <img id="captured-img" class="hidden" alt="Gemaakt onderdeel" />
+        <img id="captured-img" class="${currentPhoto ? '' : 'hidden'}" alt="" ${currentPhoto ? `src="${currentPhoto}"` : ''} />
       </div>
       <div class="row">
         <button class="btn btn-secondary" onclick="startCamera()">📷 Camera</button>
-        <button class="btn btn-secondary" onclick="document.getElementById('file-input').click()">📁 Uit bibliotheek</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('file-input').click()">📁 Bibliotheek</button>
       </div>
       <input type="file" id="file-input" accept="image/*" style="display:none" onchange="handleFileUpload(event)" />
       <button id="capture-btn" class="btn btn-primary hidden" style="margin-top: 8px;" onclick="capturePhoto()">📸 Maak foto</button>
     </div>
 
-    <div class="card" id="ai-section">
-      <p class="card-title"><span class="step">Stap 3</span> AI-voorstel & details</p>
-      <div class="info-banner">
-        <span>ℹ️</span>
-        <div>In dit prototype simuleren we de AI-herkenning. In de definitieve versie wordt hier de Claude/OpenAI Vision API gebruikt om het onderdeel te herkennen.</div>
-      </div>
+    <div class="card">
+      <p class="card-title"><span class="step">3</span> Details</p>
       <div class="ai-result hidden" id="ai-result">
         <strong>AI-voorstel:</strong> <span id="ai-suggestion-text"></span>
       </div>
-
       <div class="field">
-        <label>Naam onderdeel</label>
-        <input type="text" id="item-name" placeholder="Bijv. Sprinklerkop, CV-ketel, Heggenschaar" />
+        <label>Naam onderdeel *</label>
+        <input type="text" id="item-name" placeholder="Bijv. Sprinklerkop, CV-ketel, Heggenschaar" value="${escapeHtml(item?.name || '')}" />
       </div>
       <div class="row">
         <div>
-          <label>Fabrikant (optioneel)</label>
-          <input type="text" id="item-manufacturer" placeholder="Bijv. Viking, Vaillant" />
+          <label>Fabrikant</label>
+          <input type="text" id="item-manufacturer" placeholder="Bijv. Viking" value="${escapeHtml(item?.manufacturer || '')}" />
         </div>
         <div>
-          <label>Type / model (optioneel)</label>
-          <input type="text" id="item-type" placeholder="Bijv. VK102" />
+          <label>Type / model</label>
+          <input type="text" id="item-type" placeholder="Bijv. VK102" value="${escapeHtml(item?.type || '')}" />
         </div>
       </div>
       <div class="row">
         <div>
-          <label>Geïnstalleerd op (optioneel)</label>
-          <input type="date" id="item-installed" />
+          <label>Geïnstalleerd op</label>
+          <input type="date" id="item-installed" value="${item?.installed || ''}" />
         </div>
         <div>
           <label>Onderhoudsfrequentie</label>
           <select id="item-frequency">
-            <option value="30">Maandelijks</option>
-            <option value="90">Per kwartaal</option>
-            <option value="180">Halfjaarlijks</option>
-            <option value="365" selected>Jaarlijks</option>
-            <option value="730">Tweejaarlijks</option>
-            <option value="1825">Elke 5 jaar</option>
+            <option value="30" ${item?.frequency === 30 ? 'selected' : ''}>Maandelijks</option>
+            <option value="90" ${item?.frequency === 90 ? 'selected' : ''}>Per kwartaal</option>
+            <option value="180" ${item?.frequency === 180 ? 'selected' : ''}>Halfjaarlijks</option>
+            <option value="365" ${!item || item?.frequency === 365 ? 'selected' : ''}>Jaarlijks</option>
+            <option value="730" ${item?.frequency === 730 ? 'selected' : ''}>Tweejaarlijks</option>
+            <option value="1825" ${item?.frequency === 1825 ? 'selected' : ''}>Elke 5 jaar</option>
           </select>
         </div>
       </div>
       <div class="field">
-        <label>Toepasselijke norm / advies (optioneel)</label>
-        <input type="text" id="item-norm" placeholder="Bijv. NEN-EN 12845" />
+        <label>Toepasselijke norm / advies</label>
+        <input type="text" id="item-norm" placeholder="Bijv. NEN-EN 12845" value="${escapeHtml(item?.norm || '')}" />
       </div>
       <div class="field">
-        <label>Notities (optioneel)</label>
-        <textarea id="item-notes" rows="2" placeholder="Bijzonderheden, leverancier, etc."></textarea>
+        <label>Notities</label>
+        <textarea id="item-notes" rows="2" placeholder="Bijzonderheden, leverancier, etc.">${escapeHtml(item?.notes || '')}</textarea>
       </div>
     </div>
 
     <div class="card">
-      <p class="card-title"><span class="step">Stap 4</span> Melding</p>
+      <p class="card-title"><span class="step">4</span> Melding</p>
       <div class="row">
         <div>
           <label>Volgend onderhoud op</label>
-          <input type="date" id="item-next" />
+          <input type="date" id="item-next" value="${item?.nextDate || ''}" />
         </div>
         <div>
-          <label>Herinner mij ... dagen vooraf</label>
-          <input type="number" id="item-remind" value="14" min="1" max="180" />
+          <label>Herinner ... dagen vooraf</label>
+          <input type="number" id="item-remind" value="${item?.remindDays || 14}" min="1" max="180" />
         </div>
-      </div>
-      <div class="info-banner">
-        <span>📧</span>
-        <div>E-mailmeldingen worden in de volgende fase ingebouwd. Voor nu zie je herinneringen in het overzicht.</div>
       </div>
     </div>
 
-    <button class="btn btn-primary" onclick="saveItem()">✓ Onderdeel opslaan</button>
-  </div>
+    ${isEdit ? `
+      <button class="btn btn-primary" onclick="saveItem()">✓ Wijzigingen opslaan</button>
+      <div class="row-actions">
+        <button class="btn btn-secondary" onclick="markCompleted(${item.id})">✓ Uitgevoerd</button>
+        <button class="btn btn-danger" onclick="deleteItem(${item.id})">🗑 Verwijder</button>
+      </div>
+    ` : `
+      <button class="btn btn-primary" onclick="saveItem()">✓ Onderdeel opslaan</button>
+    `}
+  `;
+}
 
-  <!-- SETTINGS TAB -->
-  <div id="tab-settings" class="tab-content hidden">
+function renderSettings(main) {
+  main.innerHTML = `
+    <div class="tabs">
+      <button class="tab" onclick="goTo('locations')">Locaties</button>
+      <button class="tab active" onclick="goTo('settings')">Instellingen</button>
+    </div>
+
     <div class="card">
-      <p class="card-title">Notificatie-ontvangers</p>
+      <p class="card-title">📧 Notificatie-ontvangers</p>
       <p style="font-size: 13px; color: var(--text-muted); margin-top: 0;">E-mailadressen die straks meldingen krijgen.</p>
       <div class="field">
         <label>E-mailadres toevoegen</label>
@@ -468,7 +701,7 @@
     </div>
 
     <div class="card">
-      <p class="card-title">Data beheren</p>
+      <p class="card-title">💾 Data beheren</p>
       <p style="font-size: 13px; color: var(--text-muted); margin-top: 0;">Je data staat lokaal in deze browser. Exporteer regelmatig als back-up.</p>
       <div class="row">
         <button class="btn btn-secondary" onclick="exportData()">⬇ Exporteer alles</button>
@@ -479,300 +712,325 @@
     </div>
 
     <div class="card">
-      <p class="card-title">Over deze app</p>
+      <p class="card-title">ℹ️ Over</p>
       <p style="font-size: 13px; color: var(--text-muted);">
-        Prototype v0.1 – Universele onderhoudsapp voor zakelijk en privégebruik. Werkt op elke browser, ook op de telefoon. Voeg toe aan startscherm om als app te gebruiken.
+        Universele onderhoudsapp v0.2 – Voor zakelijk en privégebruik.
+      </p>
+      <p style="font-size: 12px; color: var(--text-muted);">
+        ${locations.length} locaties • ${items.length} onderdelen
       </p>
     </div>
-  </div>
+  `;
+  renderEmails();
+}
 
-</main>
+function goTo(screen) {
+  view = { screen, locationId: null, editItemId: null, editLocationId: null };
+  stopCamera();
+  window.scrollTo(0, 0);
+  render();
+}
 
-<script>
-  // ============ STATE ============
-  let items = JSON.parse(localStorage.getItem('items') || '[]');
-  let emails = JSON.parse(localStorage.getItem('emails') || '[]');
-  let context = 'zakelijk';
-  let currentPhoto = null;
-  let stream = null;
-
-  // ============ TABS ============
-  document.querySelectorAll('.tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-      document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
-      tab.classList.add('active');
-      document.getElementById('tab-' + tab.dataset.tab).classList.remove('hidden');
-      if (tab.dataset.tab === 'overview') renderItems();
-      if (tab.dataset.tab === 'settings') renderEmails();
-    });
-  });
-
-  // Context toggle
-  document.querySelectorAll('.toggle-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      context = btn.dataset.context;
-    });
-  });
-
-  // ============ CAMERA ============
-  async function startCamera() {
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-      const video = document.getElementById('camera-video');
-      video.srcObject = stream;
-      video.classList.remove('hidden');
-      document.getElementById('camera-placeholder').classList.add('hidden');
-      document.getElementById('captured-img').classList.add('hidden');
-      document.getElementById('capture-btn').classList.remove('hidden');
-    } catch (err) {
-      alert('Camera kon niet starten: ' + err.message + '\n\nGebruik anders "Uit bibliotheek".');
+function goBack() {
+  if (view.screen === 'item-form') {
+    view.screen = view.locationId ? 'location-detail' : 'locations';
+  } else if (view.screen === 'location-form') {
+    if (view.editLocationId) {
+      view.screen = 'location-detail';
+      view.locationId = view.editLocationId;
+    } else {
+      view.screen = 'locations';
     }
   }
+  view.editItemId = null;
+  view.editLocationId = null;
+  stopCamera();
+  window.scrollTo(0, 0);
+  render();
+}
 
-  function capturePhoto() {
+function openLocation(id) {
+  view = { screen: 'location-detail', locationId: id, editItemId: null, editLocationId: null };
+  window.scrollTo(0, 0);
+  render();
+}
+
+function editLocation(id) {
+  view = { screen: 'location-form', locationId: id, editItemId: null, editLocationId: id };
+  window.scrollTo(0, 0);
+  render();
+}
+
+function editItem(id) {
+  view = { ...view, screen: 'item-form', editItemId: id };
+  window.scrollTo(0, 0);
+  render();
+}
+
+function onFabClick() {
+  if (view.screen === 'locations') {
+    view = { screen: 'location-form', locationId: null, editItemId: null, editLocationId: null };
+  } else if (view.screen === 'location-detail') {
+    if (locations.length === 0) { alert('Maak eerst een locatie aan.'); return; }
+    view = { screen: 'item-form', locationId: view.locationId, editItemId: null, editLocationId: null };
+  }
+  window.scrollTo(0, 0);
+  render();
+}
+
+function toggleContext(btn) {
+  document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function saveLocation() {
+  const name = document.getElementById('loc-name').value.trim();
+  if (!name) { alert('Geef de locatie een naam.'); return; }
+  const address = document.getElementById('loc-address').value.trim();
+  const context = document.querySelector('.toggle-btn.active')?.dataset.context || 'zakelijk';
+  const country = document.getElementById('loc-country').value;
+
+  if (view.editLocationId) {
+    const loc = locations.find(l => l.id === view.editLocationId);
+    if (loc) { loc.name = name; loc.address = address; loc.context = context; loc.country = country; }
+    view.locationId = view.editLocationId;
+  } else {
+    const loc = { id: Date.now(), name, address, context, country, createdAt: new Date().toISOString() };
+    locations.push(loc);
+    view.locationId = loc.id;
+  }
+  save();
+  view.screen = 'location-detail';
+  view.editLocationId = null;
+  render();
+}
+
+function deleteLocation(id) {
+  const locItems = items.filter(i => i.locationId === id);
+  let msg = 'Deze locatie verwijderen?';
+  if (locItems.length > 0) msg += `\n\nLet op: ${locItems.length} onderdelen op deze locatie worden ook verwijderd!`;
+  if (!confirm(msg)) return;
+  locations = locations.filter(l => l.id !== id);
+  items = items.filter(i => i.locationId !== id);
+  save();
+  goTo('locations');
+}
+
+function saveItem() {
+  const name = document.getElementById('item-name').value.trim();
+  const locationId = parseInt(document.getElementById('item-location').value);
+  if (!name) { alert('Geef het onderdeel een naam.'); return; }
+  if (!locationId) { alert('Kies een locatie.'); return; }
+
+  const data = {
+    locationId,
+    name,
+    room: document.getElementById('item-room').value.trim(),
+    manufacturer: document.getElementById('item-manufacturer').value.trim(),
+    type: document.getElementById('item-type').value.trim(),
+    installed: document.getElementById('item-installed').value,
+    frequency: parseInt(document.getElementById('item-frequency').value),
+    norm: document.getElementById('item-norm').value.trim(),
+    notes: document.getElementById('item-notes').value.trim(),
+    nextDate: document.getElementById('item-next').value,
+    remindDays: parseInt(document.getElementById('item-remind').value) || 14,
+    photo: currentPhoto
+  };
+
+  if (view.editItemId) {
+    const item = items.find(i => i.id === view.editItemId);
+    if (item) Object.assign(item, data);
+  } else {
+    items.push({ id: Date.now(), ...data, createdAt: new Date().toISOString() });
+  }
+
+  save();
+  stopCamera();
+  view.screen = 'location-detail';
+  view.locationId = locationId;
+  view.editItemId = null;
+  render();
+}
+
+function deleteItem(id) {
+  if (!confirm('Dit onderdeel verwijderen?')) return;
+  items = items.filter(i => i.id !== id);
+  save();
+  goBack();
+}
+
+function markCompleted(id) {
+  const item = items.find(i => i.id === id);
+  if (!item) return;
+  if (!confirm('Onderhoud gemarkeerd als uitgevoerd vandaag? De volgende datum wordt automatisch berekend.')) return;
+  const next = new Date();
+  next.setDate(next.getDate() + (item.frequency || 365));
+  item.nextDate = next.toISOString().split('T')[0];
+  item.lastDone = new Date().toISOString().split('T')[0];
+  save();
+  goBack();
+}
+
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
     const video = document.getElementById('camera-video');
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext('2d').drawImage(video, 0, 0);
-    currentPhoto = canvas.toDataURL('image/jpeg', 0.7);
-    showCapturedPhoto();
-    stopCamera();
-    simulateAI();
-  }
-
-  function handleFileUpload(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      currentPhoto = ev.target.result;
-      showCapturedPhoto();
-      simulateAI();
-    };
-    reader.readAsDataURL(file);
-  }
-
-  function showCapturedPhoto() {
-    const img = document.getElementById('captured-img');
-    img.src = currentPhoto;
-    img.classList.remove('hidden');
+    video.srcObject = stream;
+    video.classList.remove('hidden');
     document.getElementById('camera-placeholder').classList.add('hidden');
-    document.getElementById('camera-video').classList.add('hidden');
-    document.getElementById('capture-btn').classList.add('hidden');
+    document.getElementById('captured-img').classList.add('hidden');
+    document.getElementById('capture-btn').classList.remove('hidden');
+  } catch (err) {
+    alert('Camera kon niet starten: ' + err.message + '\n\nGebruik anders "Bibliotheek".');
   }
+}
 
-  function stopCamera() {
-    if (stream) {
-      stream.getTracks().forEach(t => t.stop());
-      stream = null;
-    }
-  }
+function capturePhoto() {
+  const video = document.getElementById('camera-video');
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  currentPhoto = canvas.toDataURL('image/jpeg', 0.7);
+  showCapturedPhoto();
+  stopCamera();
+  simulateAI();
+}
 
-  // ============ AI SIMULATION ============
-  function simulateAI() {
-    const suggestions = [
-      { name: 'Sprinklerkop, glasbulb', manuf: 'Viking', type: 'VK102', freq: '365', norm: 'NEN-EN 12845' },
-      { name: 'CV-ketel', manuf: 'Vaillant', type: 'ecoTEC plus', freq: '365', norm: 'NEN 8025' },
-      { name: 'Rookmelder', manuf: 'Kidde', type: '10Y', freq: '365', norm: 'NEN 2535' },
-      { name: 'Heggenschaar', manuf: 'Bosch', type: 'AHS 50-16', freq: '180', norm: '—' },
-      { name: 'Brandblusser, poeder 6kg', manuf: 'Ajax', type: 'P6', freq: '365', norm: 'NEN 2559' },
-      { name: 'Ventilatie-unit (WTW)', manuf: 'Itho Daalderop', type: 'HRU ECO', freq: '180', norm: 'NEN 1087' },
-    ];
-    const pick = suggestions[Math.floor(Math.random() * suggestions.length)];
-    document.getElementById('ai-suggestion-text').textContent = `Dit lijkt op een "${pick.name}". Velden zijn alvast ingevuld – controleer en pas aan waar nodig.`;
-    document.getElementById('ai-result').classList.remove('hidden');
-    document.getElementById('item-name').value = pick.name;
-    document.getElementById('item-manufacturer').value = pick.manuf;
-    document.getElementById('item-type').value = pick.type;
-    document.getElementById('item-frequency').value = pick.freq;
-    document.getElementById('item-norm').value = pick.norm;
-    // Suggested next maintenance date based on frequency
+function handleFileUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    currentPhoto = ev.target.result;
+    showCapturedPhoto();
+    simulateAI();
+  };
+  reader.readAsDataURL(file);
+}
+
+function showCapturedPhoto() {
+  const img = document.getElementById('captured-img');
+  img.src = currentPhoto;
+  img.classList.remove('hidden');
+  document.getElementById('camera-placeholder').classList.add('hidden');
+  document.getElementById('camera-video').classList.add('hidden');
+  document.getElementById('capture-btn').classList.add('hidden');
+}
+
+function stopCamera() {
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+}
+
+function simulateAI() {
+  const suggestions = [
+    { name: 'Sprinklerkop, glasbulb', manuf: 'Viking', type: 'VK102', freq: '365', norm: 'NEN-EN 12845' },
+    { name: 'CV-ketel', manuf: 'Vaillant', type: 'ecoTEC plus', freq: '365', norm: 'NEN 8025' },
+    { name: 'Rookmelder', manuf: 'Kidde', type: '10Y', freq: '365', norm: 'NEN 2535' },
+    { name: 'Heggenschaar', manuf: 'Bosch', type: 'AHS 50-16', freq: '180', norm: '—' },
+    { name: 'Brandblusser, poeder 6kg', manuf: 'Ajax', type: 'P6', freq: '365', norm: 'NEN 2559' },
+    { name: 'Ventilatie-unit (WTW)', manuf: 'Itho Daalderop', type: 'HRU ECO', freq: '180', norm: 'NEN 1087' },
+  ];
+  const pick = suggestions[Math.floor(Math.random() * suggestions.length)];
+  document.getElementById('ai-suggestion-text').textContent = `Dit lijkt op een "${pick.name}". Velden alvast ingevuld – controleer en pas aan.`;
+  document.getElementById('ai-result').classList.remove('hidden');
+  if (!document.getElementById('item-name').value) document.getElementById('item-name').value = pick.name;
+  if (!document.getElementById('item-manufacturer').value) document.getElementById('item-manufacturer').value = pick.manuf;
+  if (!document.getElementById('item-type').value) document.getElementById('item-type').value = pick.type;
+  if (!document.getElementById('item-norm').value) document.getElementById('item-norm').value = pick.norm;
+  document.getElementById('item-frequency').value = pick.freq;
+  if (!document.getElementById('item-next').value) {
     const next = new Date();
     next.setDate(next.getDate() + parseInt(pick.freq));
     document.getElementById('item-next').value = next.toISOString().split('T')[0];
   }
+}
 
-  // ============ ITEMS ============
-  function saveItem() {
-    const name = document.getElementById('item-name').value.trim();
-    const address = document.getElementById('loc-address').value.trim();
-    if (!name) { alert('Geef het onderdeel een naam.'); return; }
-    if (!address) { alert('Vul een locatie in.'); return; }
+function addEmail() {
+  const input = document.getElementById('new-email');
+  const email = input.value.trim();
+  if (!email || !email.includes('@')) { alert('Geldig e-mailadres invullen.'); return; }
+  if (emails.includes(email)) { alert('Adres staat er al in.'); return; }
+  emails.push(email);
+  save();
+  input.value = '';
+  renderEmails();
+}
 
-    const item = {
-      id: Date.now(),
-      name,
-      address,
-      room: document.getElementById('loc-room').value.trim(),
-      context,
-      country: document.getElementById('country').value,
-      manufacturer: document.getElementById('item-manufacturer').value.trim(),
-      type: document.getElementById('item-type').value.trim(),
-      installed: document.getElementById('item-installed').value,
-      frequency: parseInt(document.getElementById('item-frequency').value),
-      norm: document.getElementById('item-norm').value.trim(),
-      notes: document.getElementById('item-notes').value.trim(),
-      nextDate: document.getElementById('item-next').value,
-      remindDays: parseInt(document.getElementById('item-remind').value) || 14,
-      photo: currentPhoto,
-      createdAt: new Date().toISOString()
-    };
+function removeEmail(email) {
+  emails = emails.filter(e => e !== email);
+  save();
+  renderEmails();
+}
 
-    items.push(item);
-    localStorage.setItem('items', JSON.stringify(items));
-    alert('Onderdeel opgeslagen!');
-    resetForm();
-    document.querySelector('[data-tab="overview"]').click();
+function renderEmails() {
+  const div = document.getElementById('email-list');
+  if (!div) return;
+  if (emails.length === 0) {
+    div.innerHTML = '<p style="font-size:13px;color:var(--text-muted);">Nog geen e-mailadressen.</p>';
+    return;
   }
+  div.innerHTML = emails.map(e =>
+    `<span class="email-tag">${escapeHtml(e)} <button onclick="removeEmail('${escapeHtml(e)}')">×</button></span>`
+  ).join('');
+}
 
-  function resetForm() {
-    document.querySelectorAll('#tab-add input, #tab-add textarea').forEach(el => {
-      if (el.type !== 'file') el.value = '';
-    });
-    document.getElementById('item-frequency').value = '365';
-    document.getElementById('item-remind').value = '14';
-    document.getElementById('country').value = 'NL';
-    document.getElementById('ai-result').classList.add('hidden');
-    document.getElementById('captured-img').classList.add('hidden');
-    document.getElementById('camera-placeholder').classList.remove('hidden');
-    currentPhoto = null;
-  }
+function exportData() {
+  const data = { locations, items, emails, exportedAt: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `onderhoudsapp-backup-${new Date().toISOString().split('T')[0]}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
-  function deleteItem(id) {
-    if (!confirm('Dit onderdeel verwijderen?')) return;
-    items = items.filter(i => i.id !== id);
-    localStorage.setItem('items', JSON.stringify(items));
-    renderItems();
-  }
+function importData(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      const lCount = data.locations?.length || 0;
+      const iCount = data.items?.length || 0;
+      if (!confirm(`Importeren?\n${lCount} locaties en ${iCount} onderdelen worden toegevoegd.`)) return;
+      if (data.locations) locations = locations.concat(data.locations);
+      if (data.items) items = items.concat(data.items);
+      if (data.emails) emails = [...new Set(emails.concat(data.emails))];
+      save();
+      render();
+      alert('Import gelukt!');
+    } catch (err) { alert('Bestand kon niet gelezen worden.'); }
+  };
+  reader.readAsText(file);
+}
 
-  function renderItems() {
-    const list = document.getElementById('item-list');
-    if (items.length === 0) {
-      list.innerHTML = `
-        <div class="empty">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-          <p><strong>Nog geen onderdelen</strong></p>
-          <p>Tik op "+ Toevoegen" om te beginnen.</p>
-        </div>`;
-      document.getElementById('badge-overdue').classList.add('hidden');
-      return;
-    }
+function clearAll() {
+  if (!confirm('ALLE data wissen? Dit kan niet ongedaan worden.')) return;
+  if (!confirm('Weet je het echt zeker?')) return;
+  locations = []; items = []; emails = [];
+  localStorage.clear();
+  goTo('locations');
+}
 
-    const today = new Date(); today.setHours(0,0,0,0);
-    const sorted = [...items].sort((a,b) => new Date(a.nextDate) - new Date(b.nextDate));
+function save() {
+  localStorage.setItem('locations', JSON.stringify(locations));
+  localStorage.setItem('items', JSON.stringify(items));
+  localStorage.setItem('emails', JSON.stringify(emails));
+}
 
-    let overdueCount = 0;
-    list.innerHTML = sorted.map(item => {
-      const due = new Date(item.nextDate);
-      const daysLeft = Math.floor((due - today) / (1000*60*60*24));
-      let dueClass = 'due-ok', dueText = `over ${daysLeft} dgn`;
-      if (daysLeft < 0) { dueClass = 'due-overdue'; dueText = `${-daysLeft} dgn over tijd`; overdueCount++; }
-      else if (daysLeft <= item.remindDays) { dueClass = 'due-soon'; dueText = `binnen ${daysLeft} dgn`; }
+function countryLabel(c) {
+  return { NL: '🇳🇱 NL', BE: '🇧🇪 BE', DE: '🇩🇪 DE', EU: '🇪🇺 EU', OTHER: '—' }[c] || '—';
+}
 
-      const icon = item.photo
-        ? `<img src="${item.photo}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;" />`
-        : (item.context === 'zakelijk' ? '🏢' : '🏠');
+function escapeHtml(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
 
-      return `
-        <div class="item">
-          <div class="item-icon">${icon}</div>
-          <div class="item-body">
-            <div class="item-name">${escapeHtml(item.name)}</div>
-            <div class="item-meta">${escapeHtml(item.address)}${item.room ? ' • ' + escapeHtml(item.room) : ''}</div>
-            <div class="item-meta">${item.manufacturer ? escapeHtml(item.manufacturer) + ' ' : ''}${escapeHtml(item.type || '')}${item.norm ? ' • ' + escapeHtml(item.norm) : ''}</div>
-          </div>
-          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
-            <span class="item-due ${dueClass}">${dueText}</span>
-            <button class="btn btn-danger" style="padding:4px 8px;font-size:11px;" onclick="deleteItem(${item.id})">verwijder</button>
-          </div>
-        </div>`;
-    }).join('');
-
-    const badge = document.getElementById('badge-overdue');
-    if (overdueCount > 0) { badge.textContent = overdueCount; badge.classList.remove('hidden'); }
-    else badge.classList.add('hidden');
-  }
-
-  // ============ EMAILS ============
-  function addEmail() {
-    const input = document.getElementById('new-email');
-    const email = input.value.trim();
-    if (!email || !email.includes('@')) { alert('Geldig e-mailadres invullen.'); return; }
-    if (emails.includes(email)) { alert('Adres staat er al in.'); return; }
-    emails.push(email);
-    localStorage.setItem('emails', JSON.stringify(emails));
-    input.value = '';
-    renderEmails();
-  }
-
-  function removeEmail(email) {
-    emails = emails.filter(e => e !== email);
-    localStorage.setItem('emails', JSON.stringify(emails));
-    renderEmails();
-  }
-
-  function renderEmails() {
-    const div = document.getElementById('email-list');
-    if (emails.length === 0) {
-      div.innerHTML = '<p style="font-size:13px;color:var(--text-muted);">Nog geen e-mailadressen toegevoegd.</p>';
-      return;
-    }
-    div.innerHTML = emails.map(e =>
-      `<span class="email-tag">${escapeHtml(e)} <button onclick="removeEmail('${escapeHtml(e)}')">×</button></span>`
-    ).join('');
-  }
-
-  // ============ DATA EXPORT/IMPORT ============
-  function exportData() {
-    const data = { items, emails, exportedAt: new Date().toISOString() };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `onderhoudsapp-backup-${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  function importData(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      try {
-        const data = JSON.parse(ev.target.result);
-        if (!confirm(`Importeren? Dit voegt ${data.items?.length || 0} onderdelen toe.`)) return;
-        if (data.items) items = items.concat(data.items);
-        if (data.emails) emails = [...new Set(emails.concat(data.emails))];
-        localStorage.setItem('items', JSON.stringify(items));
-        localStorage.setItem('emails', JSON.stringify(emails));
-        renderItems(); renderEmails();
-        alert('Import gelukt!');
-      } catch (err) { alert('Bestand kon niet gelezen worden.'); }
-    };
-    reader.readAsText(file);
-  }
-
-  function clearAll() {
-    if (!confirm('ALLE data wissen? Dit kan niet ongedaan worden.')) return;
-    if (!confirm('Weet je het zeker?')) return;
-    items = []; emails = [];
-    localStorage.clear();
-    renderItems(); renderEmails();
-  }
-
-  // ============ HELPERS ============
-  function escapeHtml(s) {
-    if (!s) return '';
-    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  }
-
-  // Initial render
-  renderItems();
+render();
 </script>
 
 </body>
