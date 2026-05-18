@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="theme-color" content="#0c4a6e" />
 <title>Aqua+ Onderhoudsapp</title>
+<!-- Firebase SDK (compat-versie, werkt zonder bundler) -->
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <style>
   :root {
     --bg: #f5f7fa;
@@ -441,6 +444,136 @@ const SUPPLIERS = {
   'overig':    { name: 'Overig',    url: q => `https://www.google.com/search?q=${encodeURIComponent(q + ' kopen')}&tbm=shop` }
 };
 
+// ============ FIREBASE CONFIG ============
+const firebaseConfig = {
+  apiKey: "AIzaSyACLaeSlDHDDNjAQ1HE5srtVIXbbAxDQi4",
+  authDomain: "onderhoudsapp-7f0ef.firebaseapp.com",
+  databaseURL: "https://onderhoudsapp-7f0ef-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "onderhoudsapp-7f0ef",
+  storageBucket: "onderhoudsapp-7f0ef.firebasestorage.app",
+  messagingSenderId: "3869771687",
+  appId: "1:3869771687:web:2fa6b7e487cba66cde1882"
+};
+
+let firebaseApp = null;
+let firebaseDb = null;
+try {
+  firebaseApp = firebase.initializeApp(firebaseConfig);
+  firebaseDb = firebase.database();
+} catch (err) {
+  console.warn('Firebase initialisatie mislukt:', err);
+}
+
+// Genereer een korte deel-code zoals "TUIN-A7K9"
+function generateShareCode() {
+  const prefixes = ['DEEL', 'LOC', 'HOME', 'WERK'];
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // geen 0/O/1/I om verwarring te voorkomen
+  let suffix = '';
+  for (let i = 0; i < 4; i++) suffix += chars[Math.floor(Math.random() * chars.length)];
+  return prefixes[Math.floor(Math.random() * prefixes.length)] + '-' + suffix;
+}
+
+// Eigen gebruikers-ID (lokaal opgeslagen, niet echt een account, alleen om wijzigingen te identificeren)
+function getUserId() {
+  let uid = localStorage.getItem('userId');
+  if (!uid) {
+    uid = 'u_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+    localStorage.setItem('userId', uid);
+  }
+  return uid;
+}
+
+function getUserName() {
+  return localStorage.getItem('userName') || '';
+}
+
+function setUserName(name) {
+  localStorage.setItem('userName', name);
+}
+
+// === SYNC FUNCTIES ===
+
+// Plaats locatie + onderdelen + klussen + storingen onder een deel-code in Firebase
+async function syncLocationToCloud(locationId) {
+  if (!firebaseDb) throw new Error('Firebase niet beschikbaar');
+  const loc = locations.find(l => l.id === locationId);
+  if (!loc) throw new Error('Locatie niet gevonden');
+  if (!loc.shareCode) throw new Error('Locatie heeft geen deel-code');
+
+  const locItems = items.filter(i => i.locationId === locationId);
+  const locKlussen = klussen.filter(k => k.locationId === locationId);
+  const locStoringen = storingen.filter(s => s.locationId === locationId);
+
+  const payload = {
+    location: loc,
+    items: locItems,
+    klussen: locKlussen,
+    storingen: locStoringen,
+    updatedAt: Date.now(),
+    updatedBy: getUserName() || 'iemand'
+  };
+
+  await firebaseDb.ref('shared/' + loc.shareCode).set(payload);
+}
+
+// Haal data op uit Firebase voor een specifieke deel-code
+async function fetchFromCloud(shareCode) {
+  if (!firebaseDb) throw new Error('Firebase niet beschikbaar');
+  const snapshot = await firebaseDb.ref('shared/' + shareCode).get();
+  if (!snapshot.exists()) return null;
+  return snapshot.val();
+}
+
+// Werk lokale data bij vanuit Firebase voor een gedeelde locatie
+async function pullFromCloud(shareCode) {
+  const data = await fetchFromCloud(shareCode);
+  if (!data || !data.location) return false;
+
+  // Vervang locatie (let op: id moet matchen)
+  const existingIdx = locations.findIndex(l => l.shareCode === shareCode);
+  if (existingIdx >= 0) {
+    locations[existingIdx] = data.location;
+  } else {
+    locations.push(data.location);
+  }
+
+  // Verwijder oude items/klussen/storingen voor deze locatie en zet nieuwe terug
+  const locId = data.location.id;
+  items = items.filter(i => i.locationId !== locId).concat(data.items || []);
+  klussen = klussen.filter(k => k.locationId !== locId).concat(data.klussen || []);
+  storingen = storingen.filter(s => s.locationId !== locId).concat(data.storingen || []);
+
+  save();
+  return true;
+}
+
+// Trigger sync na lokale wijziging (debounced)
+let syncTimers = {};
+function syncIfShared(locationId) {
+  if (!locationId) return;
+  const loc = locations.find(l => l.id === locationId);
+  if (!loc || !loc.shareCode) return;
+
+  clearTimeout(syncTimers[locationId]);
+  syncTimers[locationId] = setTimeout(() => {
+    syncLocationToCloud(locationId).catch(err => {
+      console.warn('Sync mislukt voor locatie', locationId, err);
+    });
+  }, 1500); // wacht 1.5 sec om meerdere wijzigingen te bundelen
+}
+
+// Pull alle gedeelde locaties opnieuw (bij app-start en bij handmatige verversen)
+async function pullAllShared() {
+  const shared = locations.filter(l => l.shareCode);
+  for (const loc of shared) {
+    try {
+      await pullFromCloud(loc.shareCode);
+    } catch (err) {
+      console.warn('Pull mislukt voor', loc.shareCode, err);
+    }
+  }
+}
+
 let view = { screen: 'locations', locationId: null, locationTab: 'onderdelen', editItemId: null, editLocationId: null, editKlusId: null, editStoringId: null };
 let currentPhoto = null;
 let stream = null;
@@ -603,11 +736,16 @@ function render() {
 
 function renderLocations(main) {
   const openStoringen = storingen.filter(s => s.status !== 'opgelost').length;
+  const hasShared = locations.some(l => l.shareCode);
   main.innerHTML = `
     <div class="tabs">
       <button class="tab active" onclick="goTo('locations')">📍 Locaties</button>
       <button class="tab" onclick="goTo('storingen')">⚠️ Storingen${openStoringen > 0 ? `<span class="badge">${openStoringen}</span>` : ''}</button>
       <button class="tab" onclick="goTo('settings')">⚙️</button>
+    </div>
+    <div class="row" style="margin-bottom:12px;">
+      <button class="btn btn-secondary btn-small" onclick="addLocationByCode()">🔗 Locatie via code</button>
+      ${hasShared ? `<button class="btn btn-secondary btn-small" onclick="refreshAllShared()">🔄 Verversen</button>` : ''}
     </div>
     <div id="loc-list"></div>
   `;
@@ -642,11 +780,12 @@ function renderLocations(main) {
     if (!stats) stats = `<div class="loc-stat">${locItems.length} onderdelen</div>`;
 
     const ctxTag = `<span class="ctx-tag ctx-${loc.context}">${loc.context === 'zakelijk' ? 'Zakelijk' : 'Privé'}</span>`;
+    const shareTag = loc.shareCode ? `<span class="ctx-tag" style="background:var(--success-light);color:var(--success);">🔗 Gedeeld</span>` : '';
     return `
       <div class="loc-card" onclick="openLocation(${loc.id})">
         <div class="loc-icon">${loc.context === 'zakelijk' ? '🏢' : '🏠'}</div>
         <div class="loc-body">
-          <div class="loc-name">${escapeHtml(loc.name)}${ctxTag}</div>
+          <div class="loc-name">${escapeHtml(loc.name)}${ctxTag}${shareTag}</div>
           <div class="loc-meta">${escapeHtml(loc.address || '')}</div>
         </div>
         <div class="loc-stats">${stats}</div>
@@ -891,15 +1030,17 @@ async function saveStoring() {
   }
 
   stopCamera();
+  const storLocId = locId ? parseInt(locId) : null;
   view.editStoringId = null;
   view.screen = 'storingen';
+  syncIfShared(storLocId);
   render();
 }
 
 function markStoringOpgelost() {
   if (!confirm('Deze storing markeren als opgelost?')) return;
   const s = storingen.find(x => x.id === view.editStoringId);
-  if (s) { s.status = 'opgelost'; s.opgelostAt = new Date().toISOString(); save(); }
+  if (s) { s.status = 'opgelost'; s.opgelostAt = new Date().toISOString(); save(); syncIfShared(s.locationId); }
   view.editStoringId = null;
   view.screen = 'storingen';
   render();
@@ -907,8 +1048,11 @@ function markStoringOpgelost() {
 
 function deleteStoring() {
   if (!confirm('Deze storingsmelding verwijderen?')) return;
+  const s = storingen.find(x => x.id === view.editStoringId);
+  const locId = s?.locationId;
   storingen = storingen.filter(x => x.id !== view.editStoringId);
   save();
+  syncIfShared(locId);
   view.editStoringId = null;
   view.screen = 'storingen';
   render();
@@ -1069,6 +1213,34 @@ function renderLocationForm(main) {
         </div>
       </div>
     </div>
+
+    ${isEdit ? `
+      <div class="card">
+        <p class="card-title">🔗 Delen</p>
+        ${loc.shareCode ? `
+          <div class="success-banner">
+            <span>✓</span>
+            <div>Deze locatie is gedeeld. Iedereen met onderstaande code kan deze locatie zien en bewerken.</div>
+          </div>
+          <div style="background:var(--bg);padding:14px;border-radius:8px;text-align:center;margin-bottom:10px;">
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">DEEL-CODE</div>
+            <div style="font-size:24px;font-weight:700;letter-spacing:2px;color:var(--primary);font-family:monospace;">${escapeHtml(loc.shareCode)}</div>
+          </div>
+          <div class="row">
+            <button class="btn btn-secondary" onclick="copyShareCode('${escapeHtml(loc.shareCode)}')">📋 Kopieer code</button>
+            <button class="btn btn-secondary" onclick="shareViaSystem('${escapeHtml(loc.shareCode)}', '${escapeHtml(loc.name)}')">📤 Delen</button>
+          </div>
+          <button class="btn btn-danger" style="width:100%;margin-top:8px;" onclick="stopSharing(${loc.id})">🚫 Stop met delen</button>
+        ` : `
+          <p style="font-size:13px;color:var(--text-muted);margin-top:0;">
+            Genereer een deel-code zodat anderen deze locatie kunnen openen op hun eigen apparaat.
+            Alle onderdelen, klussen, storingen en foto's worden gesynchroniseerd.
+          </p>
+          <button class="btn btn-primary" onclick="startSharing(${loc.id})">🔗 Locatie delen</button>
+        `}
+      </div>
+    ` : ''}
+
     ${isEdit ? `
       <button class="btn btn-primary" onclick="saveLocation()">✓ Wijzigingen opslaan</button>
       <div class="row-actions">
@@ -1422,6 +1594,7 @@ function saveKlus() {
   }
 
   save();
+  syncIfShared(currentKlus.locationId);
   view.locationTab = 'klussen';
   goBack();
 }
@@ -1429,15 +1602,18 @@ function saveKlus() {
 function markKlusKlaar() {
   if (!confirm('Klus markeren als klaar?')) return;
   const k = klussen.find(k => k.id === view.editKlusId);
-  if (k) { k.status = 'klaar'; k.completedAt = new Date().toISOString(); save(); }
+  if (k) { k.status = 'klaar'; k.completedAt = new Date().toISOString(); save(); syncIfShared(k.locationId); }
   view.locationTab = 'klussen';
   goBack();
 }
 
 function deleteKlus() {
   if (!confirm('Deze klus verwijderen?')) return;
+  const k = klussen.find(k => k.id === view.editKlusId);
+  const locId = k?.locationId;
   klussen = klussen.filter(k => k.id !== view.editKlusId);
   save();
+  syncIfShared(locId);
   view.locationTab = 'klussen';
   goBack();
 }
@@ -1522,16 +1698,32 @@ function renderSettings(main) {
     </div>
 
     <div class="card">
+      <p class="card-title">👤 Jouw naam</p>
+      <p style="font-size: 13px; color: var(--text-muted); margin-top: 0;">Deze naam zien anderen bij wijzigingen op gedeelde locaties.</p>
+      <div class="field">
+        <label>Naam</label>
+        <input type="text" id="user-name" placeholder="Bijv. Jan, Papa, Marie" value="${escapeHtml(getUserName())}" />
+      </div>
+      <button class="btn btn-secondary" onclick="saveUserName()">Opslaan</button>
+    </div>
+
+    <div class="card">
       <p class="card-title">ℹ️ Over</p>
       <p style="font-size: 13px; color: var(--text-muted);">
-        Universele onderhoudsapp v0.5 – Met storingsmeldingen, klussen en AI-beeldherkenning.
+        Universele onderhoudsapp v0.6 – Met gedeelde locaties via Firebase.
       </p>
       <p style="font-size: 12px; color: var(--text-muted);">
-        ${locations.length} locaties • ${items.length} onderdelen • ${klussen.length} klussen • ${storingen.length} storingen
+        ${locations.length} locaties (${locations.filter(l=>l.shareCode).length} gedeeld) • ${items.length} onderdelen • ${klussen.length} klussen • ${storingen.length} storingen
       </p>
     </div>
   `;
   renderEmails();
+}
+
+function saveUserName() {
+  const name = document.getElementById('user-name').value.trim();
+  setUserName(name);
+  alert('Naam opgeslagen!');
 }
 
 function setAiEnabled(val, btn) {
@@ -1667,11 +1859,141 @@ function deleteLocation(id) {
     msg += `\n\nLet op: ${locItems.length} onderdelen en ${locKlus.length} klussen op deze locatie worden ook verwijderd!`;
   }
   if (!confirm(msg)) return;
+  const loc = locations.find(l => l.id === id);
+  // Verwijder ook uit cloud als gedeeld
+  if (loc?.shareCode && firebaseDb) {
+    firebaseDb.ref('shared/' + loc.shareCode).remove().catch(err => console.warn('Cloud delete mislukt:', err));
+  }
   locations = locations.filter(l => l.id !== id);
   items = items.filter(i => i.locationId !== id);
   klussen = klussen.filter(k => k.locationId !== id);
+  storingen = storingen.filter(s => s.locationId !== id);
   save();
   goTo('locations');
+}
+
+async function startSharing(locId) {
+  if (!firebaseDb) { alert('Synchronisatie is niet beschikbaar (Firebase niet verbonden).'); return; }
+  const loc = locations.find(l => l.id === locId);
+  if (!loc) return;
+  if (!getUserName()) {
+    const name = prompt('Hoe wil je dat anderen je naam zien? (bv. "Jan", "Papa")');
+    if (!name) return;
+    setUserName(name.trim());
+  }
+  // Genereer unieke code (zeer onwaarschijnlijk dat 'ie botst maar check toch)
+  let code;
+  let attempts = 0;
+  while (attempts < 5) {
+    code = generateShareCode();
+    try {
+      const existing = await fetchFromCloud(code);
+      if (!existing) break;
+    } catch { break; }
+    attempts++;
+  }
+  loc.shareCode = code;
+  save();
+  try {
+    await syncLocationToCloud(locId);
+    render();
+  } catch (err) {
+    loc.shareCode = null;
+    save();
+    alert('❌ Delen mislukt: ' + err.message);
+    render();
+  }
+}
+
+async function stopSharing(locId) {
+  const loc = locations.find(l => l.id === locId);
+  if (!loc || !loc.shareCode) return;
+  if (!confirm('Stop met delen?\n\nDe code wordt ongeldig en andere gebruikers kunnen de locatie niet meer openen. Jij behoudt je eigen kopie.')) return;
+  const code = loc.shareCode;
+  loc.shareCode = null;
+  save();
+  if (firebaseDb) {
+    try { await firebaseDb.ref('shared/' + code).remove(); }
+    catch (err) { console.warn('Cloud delete mislukt:', err); }
+  }
+  render();
+}
+
+function copyShareCode(code) {
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(code).then(() => {
+      alert('✓ Code gekopieerd: ' + code);
+    }).catch(() => {
+      prompt('Kopieer deze code:', code);
+    });
+  } else {
+    prompt('Kopieer deze code:', code);
+  }
+}
+
+function shareViaSystem(code, locName) {
+  const text = `Open de locatie "${locName}" in de Onderhoudsapp met deze code:\n\n${code}\n\nApp: https://9gjs4hfgcs-coder.github.io/Onderhoudsapp/`;
+  if (navigator.share) {
+    navigator.share({
+      title: 'Locatie delen',
+      text: text
+    }).catch(err => console.log('Delen geannuleerd', err));
+  } else {
+    copyShareCode(text);
+  }
+}
+
+async function addLocationByCode() {
+  const code = prompt('Plak hier de deel-code (bv. TUIN-A7K9):');
+  if (!code) return;
+  const cleanCode = code.trim().toUpperCase();
+
+  // Check of we 'm al hebben
+  const existing = locations.find(l => l.shareCode === cleanCode);
+  if (existing) {
+    if (confirm('Deze locatie heb je al. Opnieuw ophalen om bij te werken?')) {
+      try {
+        await pullFromCloud(cleanCode);
+        alert('✓ Locatie bijgewerkt');
+        render();
+      } catch (err) {
+        alert('❌ Ophalen mislukt: ' + err.message);
+      }
+    }
+    return;
+  }
+
+  if (!getUserName()) {
+    const name = prompt('Hoe wil je dat anderen je naam zien? (bv. "Jan", "Papa")');
+    if (!name) return;
+    setUserName(name.trim());
+  }
+
+  try {
+    const ok = await pullFromCloud(cleanCode);
+    if (!ok) {
+      alert('❌ Geen locatie gevonden met code ' + cleanCode + '.\n\nControleer de code of vraag de eigenaar om opnieuw te delen.');
+      return;
+    }
+    alert('✓ Locatie toegevoegd!');
+    render();
+  } catch (err) {
+    alert('❌ Ophalen mislukt: ' + err.message);
+  }
+}
+
+async function refreshAllShared() {
+  const btn = event?.target;
+  const oldText = btn?.textContent;
+  if (btn) { btn.textContent = '🔄 Bezig...'; btn.disabled = true; }
+  try {
+    await pullAllShared();
+    render();
+  } catch (err) {
+    alert('Verversen mislukt: ' + err.message);
+  } finally {
+    if (btn) { btn.textContent = oldText; btn.disabled = false; }
+  }
 }
 
 async function saveItem() {
@@ -1750,13 +2072,17 @@ async function saveItem() {
   view.locationTab = 'onderdelen';
   view.locationId = locationId;
   view.editItemId = null;
+  syncIfShared(locationId);
   render();
 }
 
-function deleteItem(id) {
+async function deleteItem(id) {
   if (!confirm('Dit onderdeel verwijderen?')) return;
+  const item = items.find(i => i.id === id);
+  const locId = item?.locationId;
   items = items.filter(i => i.id !== id);
   save();
+  syncIfShared(locId);
   goBack();
 }
 
@@ -1769,6 +2095,7 @@ function markCompleted(id) {
   item.nextDate = next.toISOString().split('T')[0];
   item.lastDone = new Date().toISOString().split('T')[0];
   save();
+  syncIfShared(item.locationId);
   goBack();
 }
 
@@ -2053,7 +2380,20 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+// Initialiseer
+getUserId(); // zorgt dat er een userId is
 render();
+
+// Haal gedeelde locaties op bij start (in achtergrond)
+if (firebaseDb && locations.some(l => l.shareCode)) {
+  setTimeout(() => {
+    pullAllShared().then(() => {
+      if (view.screen === 'locations' || view.screen === 'location-detail' || view.screen === 'storingen') {
+        render();
+      }
+    }).catch(err => console.warn('Auto-pull bij start mislukt:', err));
+  }, 500);
+}
 </script>
 
 </body>
