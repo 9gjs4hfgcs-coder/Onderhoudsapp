@@ -579,6 +579,7 @@ let view = { screen: 'locations', locationId: null, locationTab: 'onderdelen', e
 let currentPhoto = null;
 let stream = null;
 let currentKlus = null;
+let currentTasks = [];
 
 // ============ GEMINI HELPERS ============
 async function callGemini(parts, options = {}) {
@@ -1139,13 +1140,16 @@ function renderItemsTab(loc) {
     if (daysLeft < 0) { dueClass = 'due-overdue'; dueText = `${-daysLeft} dgn over tijd`; }
     else if (daysLeft <= (item.remindDays || 14)) { dueClass = 'due-soon'; dueText = `binnen ${daysLeft} dgn`; }
     const icon = item.photo ? `<img src="${item.photo}" alt="" />` : '🔧';
+    const openTasks = (item.tasks || []).filter(t => !t.done).length;
+    const totalTasks = (item.tasks || []).length;
     return `
       <div class="item-card" onclick="editItem(${item.id})">
         <div class="item-icon">${icon}</div>
         <div class="item-body">
           <div class="item-name">${escapeHtml(item.name)}</div>
-          <div class="item-meta">${item.room ? escapeHtml(item.room) + ' • ' : ''}${escapeHtml(item.manufacturer || '')} ${escapeHtml(item.type || '')}</div>
-          ${item.norm ? `<div class="item-meta">${escapeHtml(item.norm)}</div>` : ''}
+          <div class="item-meta">${item.room ? escapeHtml(item.room) + ' • ' : ''}${escapeHtml(item.manufacturer || '')} ${escapeHtml(item.type || '')}${item.dimension ? ' • ' + escapeHtml(item.dimension) : ''}</div>
+          ${item.norm || item.datasheet ? `<div class="item-meta">${escapeHtml(item.norm || '')}${item.datasheet ? ' • 📄 datasheet' : ''}</div>` : ''}
+          ${totalTasks > 0 ? `<div class="item-meta">✅ ${totalTasks - openTasks}/${totalTasks} taken</div>` : ''}
         </div>
         <span class="item-due ${dueClass}">${dueText}</span>
       </div>`;
@@ -1275,6 +1279,8 @@ function renderItemForm(main) {
   currentPhoto = item?.photo || null;
   // Reset of laad bestaande bronnen
   window._currentSources = item?.sources || null;
+  // Laad bestaande taken (kopie zodat we onbeperkt kunnen aanpassen)
+  currentTasks = item?.tasks ? JSON.parse(JSON.stringify(item.tasks)) : [];
 
   const locOptions = locations.map(l =>
     `<option value="${l.id}" ${(item?.locationId || view.locationId) === l.id ? 'selected' : ''}>${escapeHtml(l.name)}</option>`
@@ -1332,6 +1338,10 @@ function renderItemForm(main) {
           <input type="text" id="item-type" placeholder="Bijv. VK102" value="${escapeHtml(item?.type || '')}" />
         </div>
       </div>
+      <div class="field">
+        <label>Afmeting / diameter</label>
+        <input type="text" id="item-dimension" placeholder="Bijv. Ø 15 mm, 1/2 inch, 6 kg, 80x60 cm" value="${escapeHtml(item?.dimension || '')}" />
+      </div>
       <div class="row">
         <div>
           <label>Geïnstalleerd op</label>
@@ -1354,9 +1364,26 @@ function renderItemForm(main) {
         <input type="text" id="item-norm" placeholder="Bijv. NEN-EN 12845" value="${escapeHtml(item?.norm || '')}" />
       </div>
       <div class="field">
+        <label>Link naar datasheet / handleiding (optioneel)</label>
+        <div style="display:flex;gap:6px;">
+          <input type="text" id="item-datasheet" placeholder="https://..." value="${escapeHtml(item?.datasheet || '')}" />
+          ${item?.datasheet ? `<button class="btn btn-secondary btn-small" onclick="window.open(document.getElementById('item-datasheet').value, '_blank')">↗ Open</button>` : ''}
+        </div>
+      </div>
+      <div class="field">
         <label>Notities</label>
         <textarea id="item-notes" rows="2" placeholder="Bijzonderheden, leverancier, etc.">${escapeHtml(item?.notes || '')}</textarea>
       </div>
+    </div>
+
+    <div class="card">
+      <p class="card-title"><span class="step">3b</span> ✅ Controletaken</p>
+      <p style="font-size:12px;color:var(--text-muted);margin:0 0 10px;">Taken die uitgevoerd moeten worden bij elke onderhoudsbeurt. Vink af tijdens de controle.</p>
+      <div id="task-list"></div>
+      <button class="btn btn-secondary btn-small" style="margin-top:6px;" onclick="addTask()">+ Taak toevoegen</button>
+      ${currentTasks.length > 0 ? `
+        <button class="btn btn-secondary btn-small" style="margin-top:6px;margin-left:6px;" onclick="resetAllTaskChecks()">↻ Alle vinkjes wissen</button>
+      ` : ''}
     </div>
 
     <div class="card">
@@ -1389,6 +1416,38 @@ function renderItemForm(main) {
     const toelichting = item.notes || 'Eerder gegenereerd advies — wijzig velden om aan te passen.';
     showAiResult(toelichting, item.sources);
   }
+
+  // Render takenlijst
+  renderTasks();
+}
+
+function renderTasks() {
+  const div = document.getElementById('task-list');
+  if (!div) return;
+  if (currentTasks.length === 0) {
+    div.innerHTML = '<p style="font-size:12px;color:var(--text-muted);font-style:italic;">Nog geen taken. Tik op "+ Taak toevoegen" of laat AI ze voor je genereren bij het scannen.</p>';
+    return;
+  }
+  div.innerHTML = currentTasks.map((t, i) => `
+    <div class="tool-row">
+      <div class="check ${t.done ? 'checked' : ''}" onclick="toggleTask(${i})">${t.done ? '✓' : ''}</div>
+      <input type="text" value="${escapeHtml(t.text)}" placeholder="Bijv. Druk meten" oninput="updateTask(${i}, this.value)" />
+      <button class="del" onclick="removeTask(${i})">×</button>
+    </div>
+  `).join('');
+}
+
+function addTask() {
+  currentTasks.push({ text: '', done: false });
+  renderTasks();
+}
+function updateTask(i, val) { currentTasks[i].text = val; }
+function toggleTask(i) { currentTasks[i].done = !currentTasks[i].done; renderTasks(); }
+function removeTask(i) { currentTasks.splice(i, 1); renderTasks(); }
+function resetAllTaskChecks() {
+  if (!confirm('Alle vinkjes wissen?')) return;
+  currentTasks.forEach(t => t.done = false);
+  renderTasks();
 }
 
 function renderKlusForm(main) {
@@ -1746,7 +1805,7 @@ function renderSettings(main) {
     <div class="card">
       <p class="card-title">ℹ️ Over</p>
       <p style="font-size: 13px; color: var(--text-muted);">
-        Universele onderhoudsapp v0.7.1 – Met Snelle/Uitgebreide modus voor AI-beeldherkenning.
+        Universele onderhoudsapp v0.8 – Met afmeting, datasheet-link en afvinkbare controletaken.
       </p>
       <p style="font-size: 12px; color: var(--text-muted);">
         ${locations.length} locaties (${locations.filter(l=>l.shareCode).length} gedeeld) • ${items.length} onderdelen • ${klussen.length} klussen • ${storingen.length} storingen
@@ -2063,14 +2122,17 @@ async function saveItem() {
     room: document.getElementById('item-room').value.trim(),
     manufacturer: document.getElementById('item-manufacturer').value.trim(),
     type: document.getElementById('item-type').value.trim(),
+    dimension: document.getElementById('item-dimension').value.trim(),
     installed: document.getElementById('item-installed').value,
     frequency: parseInt(document.getElementById('item-frequency').value),
     norm: document.getElementById('item-norm').value.trim(),
+    datasheet: document.getElementById('item-datasheet').value.trim(),
     notes: document.getElementById('item-notes').value.trim(),
     nextDate: document.getElementById('item-next').value,
     remindDays: parseInt(document.getElementById('item-remind').value) || 14,
     photo: photoToSave,
-    sources: window._currentSources || null
+    sources: window._currentSources || null,
+    tasks: currentTasks.filter(t => t.text.trim() !== '')
   };
 
   // Bewaar oude staat voor rollback bij opslagfout
@@ -2135,11 +2197,13 @@ async function deleteItem(id) {
 function markCompleted(id) {
   const item = items.find(i => i.id === id);
   if (!item) return;
-  if (!confirm('Onderhoud gemarkeerd als uitgevoerd vandaag? De volgende datum wordt automatisch berekend.')) return;
+  if (!confirm('Onderhoud gemarkeerd als uitgevoerd vandaag? De volgende datum wordt automatisch berekend en alle controletaak-vinkjes worden gewist voor de volgende keer.')) return;
   const next = new Date();
   next.setDate(next.getDate() + (item.frequency || 365));
   item.nextDate = next.toISOString().split('T')[0];
   item.lastDone = new Date().toISOString().split('T')[0];
+  // Wis taak-vinkjes voor de volgende keuring
+  if (item.tasks) item.tasks.forEach(t => t.done = false);
   save();
   syncIfShared(item.locationId);
   goBack();
@@ -2248,14 +2312,17 @@ Geef ALLEEN een JSON-object terug met deze velden:
 - naam (string): korte Nederlandse beschrijving
 - fabrikant (string): fabrikant indien zichtbaar, anders ""
 - type (string): model/type indien zichtbaar, anders ""
-- frequentieDagen (number): kies één van 30, 90, 180, 365, 730, of 1825 — gebruik je kennis van gangbare onderhoudsfrequenties
+- afmeting (string): geschatte afmeting/diameter/inhoud indien zichtbaar of typisch voor dit product (bv. "Ø 15 mm", "6 kg", "80x60 cm"), anders ""
+- frequentieDagen (number): één van 30, 90, 180, 365, 730, of 1825 — gebruik je kennis van gangbare onderhoudsfrequenties
 - norm (string): relevante ${normLabel}-norm OF advies-bron (bv. "NEN 2559", "Tuinexpert-advies"), anders ""
+- datasheet (string): lege string "" (vereist Search, gebruik Uitgebreide modus)
+- taken (array van strings): 3-6 standaard controletaken die bij dit onderhoud horen, bv. ["Druk meten", "Slang inspecteren", "Manometer ijken"]. Voor planten: bv. ["Snoeien", "Mulchen", "Watergeefroutine controleren"].
 - toelichting (string): één zin over wat het is en welk onderhoud nodig is`;
 
     const text = await callGemini([
       { text: prompt },
       { inline_data: { mime_type: 'image/jpeg', data: dataUrlToBase64(currentPhoto) } }
-    ], { jsonMode: true, maxTokens: 1024, thinkingBudget: 256 });
+    ], { jsonMode: true, maxTokens: 1536, thinkingBudget: 256 });
 
     const result = extractJSON(text);
     if (!result) throw new Error('Geen geldig JSON ontvangen. Antwoord:\n\n' + text.substring(0, 300));
@@ -2289,9 +2356,12 @@ Gebruik Google Search om actuele en betrouwbare informatie te vinden over het on
 
 Geef in het Nederlands antwoord met:
 1. Wat zie je op de foto? (naam, eventueel fabrikant/type)
-2. Wat is de aanbevolen onderhoudsfrequentie?
-3. Welke specifieke norm of technisch bulletin is van toepassing, OF welke bron geeft dit advies?
-4. Korte toelichting (1-2 zinnen) over wat het onderhoud inhoudt en wanneer het beste uitgevoerd wordt.`;
+2. Afmeting/diameter (indien af te leiden uit foto of typisch voor het product)
+3. Wat is de aanbevolen onderhoudsfrequentie?
+4. Welke specifieke norm of technisch bulletin is van toepassing, OF welke bron geeft dit advies?
+5. Een URL naar een datasheet/handleiding op de fabrikantenwebsite (indien gevonden)
+6. Een lijst van 3-6 concrete controletaken die uitgevoerd moeten worden bij elke onderhoudsbeurt
+7. Korte toelichting (1-2 zinnen) over wat het onderhoud inhoudt en wanneer het beste uitgevoerd wordt.`;
 
     const stap1Result = await callGemini([
       { text: stap1Prompt },
@@ -2310,15 +2380,18 @@ Zet dit om naar een JSON-object met EXACT deze velden:
 - naam (string)
 - fabrikant (string): "" als niet genoemd
 - type (string): "" als niet genoemd
+- afmeting (string): "" als niet genoemd
 - frequentieDagen (number): één van 30, 90, 180, 365, 730, 1825
 - norm (string): de genoemde norm/bron zo letterlijk mogelijk
+- datasheet (string): URL naar datasheet/handleiding indien genoemd, anders ""
+- taken (array van strings): de genoemde controletaken, bv. ["Druk meten", "Slang inspecteren"]
 - toelichting (string): één zin met de kern van het advies
 
 Antwoord ALLEEN met JSON.`;
 
     const jsonText = await callGemini(
       [{ text: stap2Prompt }],
-      { jsonMode: true, maxTokens: 512, thinkingBudget: 64 }
+      { jsonMode: true, maxTokens: 1024, thinkingBudget: 64 }
     );
 
     const result = extractJSON(jsonText);
@@ -2356,14 +2429,18 @@ function fillFormFromResult(result) {
   const nameEl = document.getElementById('item-name');
   const manufEl = document.getElementById('item-manufacturer');
   const typeEl = document.getElementById('item-type');
+  const dimEl = document.getElementById('item-dimension');
   const freqEl = document.getElementById('item-frequency');
   const normEl = document.getElementById('item-norm');
+  const dsEl = document.getElementById('item-datasheet');
   const nextEl = document.getElementById('item-next');
 
   if (result.naam && !nameEl.value) nameEl.value = result.naam;
   if (result.fabrikant && !manufEl.value) manufEl.value = result.fabrikant;
   if (result.type && !typeEl.value) typeEl.value = result.type;
+  if (result.afmeting && dimEl && !dimEl.value) dimEl.value = result.afmeting;
   if (result.norm && !normEl.value) normEl.value = result.norm;
+  if (result.datasheet && dsEl && !dsEl.value) dsEl.value = result.datasheet;
   if (result.frequentieDagen) {
     const valid = [30, 90, 180, 365, 730, 1825];
     const closest = valid.reduce((p, c) =>
@@ -2375,6 +2452,11 @@ function fillFormFromResult(result) {
       next.setDate(next.getDate() + closest);
       nextEl.value = next.toISOString().split('T')[0];
     }
+  }
+  // Voeg AI-gegenereerde taken toe als de huidige lijst leeg is
+  if (Array.isArray(result.taken) && result.taken.length > 0 && currentTasks.length === 0) {
+    currentTasks = result.taken.map(t => ({ text: String(t).trim(), done: false })).filter(t => t.text);
+    renderTasks();
   }
 }
 
@@ -2426,12 +2508,12 @@ function showAiResult(toelichting, sources) {
 
 function simulateAI() {
   const suggestions = [
-    { name: 'Sprinklerkop, glasbulb', manuf: 'Viking', type: 'VK102', freq: '365', norm: 'NEN-EN 12845' },
-    { name: 'CV-ketel', manuf: 'Vaillant', type: 'ecoTEC plus', freq: '365', norm: 'NEN 8025' },
-    { name: 'Rookmelder', manuf: 'Kidde', type: '10Y', freq: '365', norm: 'NEN 2535' },
-    { name: 'Heggenschaar', manuf: 'Bosch', type: 'AHS 50-16', freq: '180', norm: '—' },
-    { name: 'Brandblusser, poeder 6kg', manuf: 'Ajax', type: 'P6', freq: '365', norm: 'NEN 2559' },
-    { name: 'Ventilatie-unit (WTW)', manuf: 'Itho Daalderop', type: 'HRU ECO', freq: '180', norm: 'NEN 1087' },
+    { name: 'Sprinklerkop, glasbulb', manuf: 'Viking', type: 'VK102', freq: '365', norm: 'NEN-EN 12845', tasks: ['Visueel inspecteren op corrosie', 'Glasbulb controleren', 'Sproei-patroon testen', 'Bevestiging nakijken'] },
+    { name: 'CV-ketel', manuf: 'Vaillant', type: 'ecoTEC plus', freq: '365', norm: 'NEN 8025', tasks: ['Branders reinigen', 'Waterdruk meten', 'Rookgasanalyse', 'Filters vervangen', 'Veiligheidsklep testen'] },
+    { name: 'Rookmelder', manuf: 'Kidde', type: '10Y', freq: '365', norm: 'NEN 2535', tasks: ['Testknop indrukken', 'Batterij-indicatie checken', 'Stof verwijderen', 'Vervaldatum noteren'] },
+    { name: 'Heggenschaar', manuf: 'Bosch', type: 'AHS 50-16', freq: '180', norm: '—', tasks: ['Messen slijpen', 'Smeren scharnierpunten', 'Snoer/accu controleren', 'Beschermkap checken'] },
+    { name: 'Brandblusser, poeder 6kg', manuf: 'Ajax', type: 'P6', freq: '365', norm: 'NEN 2559', tasks: ['Manometer controleren', 'Wegen', 'Slang inspecteren', 'Plombe checken', 'Pictogram zichtbaar'] },
+    { name: 'Ventilatie-unit (WTW)', manuf: 'Itho Daalderop', type: 'HRU ECO', freq: '180', norm: 'NEN 1087', tasks: ['Filters vervangen', 'Ventilatorbladen reinigen', 'Condensafvoer controleren', 'Geluid beoordelen'] },
   ];
   const pick = suggestions[Math.floor(Math.random() * suggestions.length)];
   showAiResult(`Voorbeeld (geen AI actief): "${pick.name}". Zet AI aan in Instellingen voor echte herkenning.`, null);
@@ -2444,6 +2526,10 @@ function simulateAI() {
     const next = new Date();
     next.setDate(next.getDate() + parseInt(pick.freq));
     document.getElementById('item-next').value = next.toISOString().split('T')[0];
+  }
+  if (currentTasks.length === 0 && pick.tasks) {
+    currentTasks = pick.tasks.map(t => ({ text: t, done: false }));
+    renderTasks();
   }
 }
 
