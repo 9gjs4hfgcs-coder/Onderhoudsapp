@@ -727,6 +727,10 @@ function render() {
     headerTitle.innerHTML = '⚠️ Storingen';
     fab.classList.remove('hidden');
     renderStoringen(main);
+  } else if (view.screen === 'planning') {
+    headerTitle.innerHTML = '📅 Planning';
+    fab.classList.add('hidden');
+    renderPlanning(main);
   } else if (view.screen === 'storing-form') {
     headerTitle.innerHTML = `<button class="back-btn" onclick="goTo('storingen')">←</button> ${view.editStoringId ? 'Storing bewerken' : 'Nieuwe storing'}`;
     fab.classList.add('hidden');
@@ -760,8 +764,9 @@ function renderLocations(main) {
   const hasShared = locations.some(l => l.shareCode);
   main.innerHTML = `
     <div class="tabs">
-      <button class="tab active" onclick="goTo('locations')">📍 Locaties</button>
-      <button class="tab" onclick="goTo('storingen')">⚠️ Storingen${openStoringen > 0 ? `<span class="badge">${openStoringen}</span>` : ''}</button>
+      <button class="tab active" onclick="goTo('locations')">📍</button>
+      <button class="tab" onclick="goTo('planning')">📅</button>
+      <button class="tab" onclick="goTo('storingen')">⚠️${openStoringen > 0 ? `<span class="badge">${openStoringen}</span>` : ''}</button>
       <button class="tab" onclick="goTo('settings')">⚙️</button>
     </div>
     <div class="row" style="margin-bottom:12px;">
@@ -818,8 +823,9 @@ function renderStoringen(main) {
   const openCount = storingen.filter(s => s.status !== 'opgelost').length;
   main.innerHTML = `
     <div class="tabs">
-      <button class="tab" onclick="goTo('locations')">📍 Locaties</button>
-      <button class="tab active" onclick="goTo('storingen')">⚠️ Storingen${openCount > 0 ? `<span class="badge">${openCount}</span>` : ''}</button>
+      <button class="tab" onclick="goTo('locations')">📍</button>
+      <button class="tab" onclick="goTo('planning')">📅</button>
+      <button class="tab active" onclick="goTo('storingen')">⚠️${openCount > 0 ? `<span class="badge">${openCount}</span>` : ''}</button>
       <button class="tab" onclick="goTo('settings')">⚙️</button>
     </div>
     <div id="storing-list"></div>
@@ -862,6 +868,303 @@ function renderStoringen(main) {
         </div>
       </div>`;
   }).join('');
+}
+
+// ============ PLANNING / MATRIX ============
+let planningFilter = { locationId: 'all', period: '6m' }; // alle / 1m / 3m / 6m / 12m / all
+
+function renderPlanning(main) {
+  const openStoringen = storingen.filter(s => s.status !== 'opgelost').length;
+
+  // Bereken periode in dagen
+  const periodDays = { '1m': 30, '3m': 90, '6m': 180, '12m': 365, 'all': 99999 }[planningFilter.period] || 180;
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const cutoff = new Date(today);
+  cutoff.setDate(cutoff.getDate() + periodDays);
+
+  // Filter onderdelen
+  let relevant = items.filter(i => i.nextDate);
+  if (planningFilter.locationId !== 'all') {
+    relevant = relevant.filter(i => i.locationId === parseInt(planningFilter.locationId));
+  }
+  if (planningFilter.period !== 'all') {
+    relevant = relevant.filter(i => {
+      const due = new Date(i.nextDate);
+      return due <= cutoff;
+    });
+  }
+
+  // Sorteer op datum (oudste eerst, ook over-tijd)
+  relevant.sort((a,b) => new Date(a.nextDate) - new Date(b.nextDate));
+
+  // Groepeer per maand
+  const groups = {};
+  relevant.forEach(i => {
+    const d = new Date(i.nextDate);
+    const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    if (!groups[key]) groups[key] = { label: formatMonthYear(d), items: [] };
+    groups[key].items.push(i);
+  });
+
+  // Over-tijd items in aparte groep
+  const overdue = relevant.filter(i => new Date(i.nextDate) < today);
+  overdue.forEach(i => {
+    // Verwijder uit normale groep, zet in 'overdue'
+    const d = new Date(i.nextDate);
+    const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    if (groups[key]) {
+      groups[key].items = groups[key].items.filter(x => x.id !== i.id);
+      if (groups[key].items.length === 0) delete groups[key];
+    }
+  });
+
+  const locOptions = `<option value="all">Alle locaties</option>` + locations.map(l =>
+    `<option value="${l.id}" ${planningFilter.locationId == l.id ? 'selected' : ''}>${escapeHtml(l.name)}</option>`
+  ).join('');
+
+  main.innerHTML = `
+    <div class="tabs">
+      <button class="tab" onclick="goTo('locations')">📍</button>
+      <button class="tab active" onclick="goTo('planning')">📅</button>
+      <button class="tab" onclick="goTo('storingen')">⚠️${openStoringen > 0 ? `<span class="badge">${openStoringen}</span>` : ''}</button>
+      <button class="tab" onclick="goTo('settings')">⚙️</button>
+    </div>
+
+    <div class="card" style="padding:10px 12px;">
+      <div class="row" style="margin-bottom:6px;">
+        <div>
+          <label style="margin-bottom:2px;">Locatie</label>
+          <select id="plan-loc" onchange="setPlanningLocation(this.value)">${locOptions}</select>
+        </div>
+        <div>
+          <label style="margin-bottom:2px;">Periode</label>
+          <select id="plan-per" onchange="setPlanningPeriod(this.value)">
+            <option value="1m" ${planningFilter.period === '1m' ? 'selected' : ''}>Komende maand</option>
+            <option value="3m" ${planningFilter.period === '3m' ? 'selected' : ''}>3 maanden</option>
+            <option value="6m" ${planningFilter.period === '6m' ? 'selected' : ''}>6 maanden</option>
+            <option value="12m" ${planningFilter.period === '12m' ? 'selected' : ''}>Komend jaar</option>
+            <option value="all" ${planningFilter.period === 'all' ? 'selected' : ''}>Alles</option>
+          </select>
+        </div>
+      </div>
+      ${relevant.length > 0 ? `
+        <button class="btn btn-secondary btn-small" style="width:100%;margin-top:4px;" onclick="exportAgendaICS()">📆 Exporteer naar agenda (.ics)</button>
+      ` : ''}
+    </div>
+
+    <div id="planning-list"></div>
+  `;
+
+  const listDiv = document.getElementById('planning-list');
+
+  if (relevant.length === 0) {
+    listDiv.innerHTML = `
+      <div class="empty">
+        <div style="font-size:48px;">📅</div>
+        <p><strong>Geen onderhoud gepland</strong></p>
+        <p>Voor de gekozen filters is er geen onderhoud gepland.</p>
+      </div>`;
+    return;
+  }
+
+  let html = '';
+
+  // Over-tijd sectie
+  if (overdue.length > 0) {
+    html += `<div style="margin-top:12px;">
+      <h3 style="font-size:13px;margin:0 0 6px;color:var(--danger);display:flex;align-items:center;gap:6px;">
+        ⚠️ Over tijd (${overdue.length})
+      </h3>
+      ${overdue.map(i => planningItemRow(i, today, 'overdue')).join('')}
+    </div>`;
+  }
+
+  // Groepen per maand
+  Object.keys(groups).sort().forEach(key => {
+    const grp = groups[key];
+    if (grp.items.length === 0) return;
+    html += `<div style="margin-top:12px;">
+      <h3 style="font-size:13px;margin:0 0 6px;color:var(--text-muted);">${escapeHtml(grp.label)} (${grp.items.length})</h3>
+      ${grp.items.map(i => planningItemRow(i, today, 'normal')).join('')}
+    </div>`;
+  });
+
+  listDiv.innerHTML = html;
+}
+
+function planningItemRow(item, today, mode) {
+  const loc = locations.find(l => l.id === item.locationId);
+  const due = new Date(item.nextDate);
+  const daysLeft = Math.floor((due - today) / (1000*60*60*24));
+  let dueClass = 'due-ok', dueText = `over ${daysLeft} dgn`;
+  if (daysLeft < 0) { dueClass = 'due-overdue'; dueText = `${-daysLeft} dgn over tijd`; }
+  else if (daysLeft === 0) { dueClass = 'due-soon'; dueText = 'vandaag'; }
+  else if (daysLeft <= (item.remindDays || 14)) { dueClass = 'due-soon'; dueText = `over ${daysLeft} dgn`; }
+
+  const icon = item.photo ? `<img src="${item.photo}" alt="" />` : '🔧';
+  const tasksTotal = (item.tasks || []).length;
+  const tasksDone = (item.tasks || []).filter(t => t.done).length;
+
+  return `
+    <div class="item-card" onclick="openLocationAndEdit(${item.locationId}, ${item.id})">
+      <div class="item-icon">${icon}</div>
+      <div class="item-body">
+        <div class="item-name">${escapeHtml(item.name)}</div>
+        <div class="item-meta">📍 ${escapeHtml(loc?.name || '?')}${item.room ? ' • ' + escapeHtml(item.room) : ''}</div>
+        <div class="item-meta">${formatDateShort(item.nextDate)} • ${frequencyLabel(item.frequency)}${tasksTotal > 0 ? ' • ✅ ' + tasksDone + '/' + tasksTotal : ''}</div>
+      </div>
+      <span class="item-due ${dueClass}">${dueText}</span>
+    </div>`;
+}
+
+function openLocationAndEdit(locId, itemId) {
+  view = { screen: 'item-form', locationId: locId, locationTab: 'onderdelen', editItemId: itemId, editLocationId: null, editKlusId: null, editStoringId: null };
+  window.scrollTo(0, 0);
+  render();
+}
+
+function setPlanningLocation(val) {
+  planningFilter.locationId = val;
+  render();
+}
+
+function setPlanningPeriod(val) {
+  planningFilter.period = val;
+  render();
+}
+
+function formatMonthYear(d) {
+  return d.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' });
+}
+
+// ============ AGENDA-EXPORT (ICS) ============
+function exportAgendaICS() {
+  const periodDays = { '1m': 30, '3m': 90, '6m': 180, '12m': 365, 'all': 99999 }[planningFilter.period] || 180;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const cutoff = new Date(today);
+  cutoff.setDate(cutoff.getDate() + periodDays);
+
+  let relevant = items.filter(i => i.nextDate);
+  if (planningFilter.locationId !== 'all') {
+    relevant = relevant.filter(i => i.locationId === parseInt(planningFilter.locationId));
+  }
+  if (planningFilter.period !== 'all') {
+    relevant = relevant.filter(i => new Date(i.nextDate) <= cutoff);
+  }
+
+  if (relevant.length === 0) {
+    alert('Geen onderhoud om te exporteren in deze selectie.');
+    return;
+  }
+
+  const recurring = confirm(`${relevant.length} onderhoudstaken vinden.\n\nWil je deze als JAARLIJKS TERUGKEREND zetten in de agenda?\n\nOK = ja, terugkerend\nAnnuleer = nee, alleen één keer`);
+
+  // Bouw ICS
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Onderhoudsapp//NL',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH'
+  ];
+
+  relevant.forEach(item => {
+    const loc = locations.find(l => l.id === item.locationId);
+    const dueDate = new Date(item.nextDate);
+    const reminderDays = item.remindDays || 14;
+
+    // ICS DATE-format: YYYYMMDD (hele dag event)
+    const dtStart = formatIcsDate(dueDate);
+    const dtEnd = formatIcsDate(new Date(dueDate.getTime() + 24*60*60*1000));
+
+    // Beschrijving samenstellen
+    let descr = `Onderhoud op locatie: ${loc?.name || 'onbekend'}`;
+    if (item.room) descr += ` (${item.room})`;
+    if (item.manufacturer || item.type) descr += `\\nFabrikant/type: ${[item.manufacturer, item.type].filter(Boolean).join(' ')}`;
+    if (item.dimension) descr += `\\nAfmeting: ${item.dimension}`;
+    if (item.norm) descr += `\\nNorm/advies: ${item.norm}`;
+    if (item.frequency) descr += `\\nFrequentie: ${frequencyLabel(item.frequency)}`;
+    if (item.tasks && item.tasks.length > 0) {
+      descr += '\\nControletaken:';
+      item.tasks.forEach(t => { descr += '\\n  - ' + t.text; });
+    }
+    if (item.notes) descr += `\\nNotitie: ${item.notes}`;
+    if (item.datasheet) descr += `\\nDatasheet: ${item.datasheet}`;
+
+    const uid = `onderhoud-${item.id}@onderhoudsapp`;
+    const summary = `🔧 ${item.name}` + (loc ? ` — ${loc.name}` : '');
+    const location = [loc?.name, loc?.address, item.room].filter(Boolean).join(', ');
+
+    lines.push('BEGIN:VEVENT');
+    lines.push('UID:' + uid);
+    lines.push('DTSTAMP:' + formatIcsDateTime(new Date()));
+    lines.push('DTSTART;VALUE=DATE:' + dtStart);
+    lines.push('DTEND;VALUE=DATE:' + dtEnd);
+    lines.push('SUMMARY:' + icsEscape(summary));
+    if (location) lines.push('LOCATION:' + icsEscape(location));
+    lines.push('DESCRIPTION:' + icsEscape(descr));
+
+    // Herinnering (alarm)
+    lines.push('BEGIN:VALARM');
+    lines.push('ACTION:DISPLAY');
+    lines.push('DESCRIPTION:Onderhoud over ' + reminderDays + ' dagen: ' + icsEscape(item.name));
+    lines.push('TRIGGER:-P' + reminderDays + 'D');
+    lines.push('END:VALARM');
+
+    // Jaarlijks terugkerend op basis van frequentie
+    if (recurring && item.frequency) {
+      // Vertaal naar ICS RRULE
+      let rrule = null;
+      if (item.frequency === 30) rrule = 'FREQ=MONTHLY';
+      else if (item.frequency === 90) rrule = 'FREQ=MONTHLY;INTERVAL=3';
+      else if (item.frequency === 180) rrule = 'FREQ=MONTHLY;INTERVAL=6';
+      else if (item.frequency === 365) rrule = 'FREQ=YEARLY';
+      else if (item.frequency === 730) rrule = 'FREQ=YEARLY;INTERVAL=2';
+      else if (item.frequency === 1825) rrule = 'FREQ=YEARLY;INTERVAL=5';
+      if (rrule) lines.push('RRULE:' + rrule);
+    }
+
+    lines.push('END:VEVENT');
+  });
+
+  lines.push('END:VCALENDAR');
+
+  // Vouw lange regels per ICS-spec (max 75 chars), maar voor praktisch gebruik niet nodig
+
+  const ics = lines.join('\r\n');
+  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const fname = `onderhoudsplanning_${new Date().toISOString().split('T')[0]}.ics`;
+  a.href = url;
+  a.download = fname;
+  a.click();
+  URL.revokeObjectURL(url);
+
+  alert(`✓ ${relevant.length} agenda-items geëxporteerd.\n\nOpen het .ics bestand om ze in je agenda-app te importeren (Google Agenda, Apple Agenda, Outlook).`);
+}
+
+function icsEscape(s) {
+  if (!s) return '';
+  return String(s).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+}
+
+function formatIcsDate(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return y + m + day;
+}
+
+function formatIcsDateTime(d) {
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  const hh = String(d.getUTCHours()).padStart(2, '0');
+  const mm = String(d.getUTCMinutes()).padStart(2, '0');
+  const ss = String(d.getUTCSeconds()).padStart(2, '0');
+  return `${y}${m}${day}T${hh}${mm}${ss}Z`;
 }
 
 function renderStoringForm(main) {
@@ -1717,8 +2020,9 @@ function renderSettings(main) {
   const openStoringen = storingen.filter(s => s.status !== 'opgelost').length;
   main.innerHTML = `
     <div class="tabs">
-      <button class="tab" onclick="goTo('locations')">📍 Locaties</button>
-      <button class="tab" onclick="goTo('storingen')">⚠️ Storingen${openStoringen > 0 ? `<span class="badge">${openStoringen}</span>` : ''}</button>
+      <button class="tab" onclick="goTo('locations')">📍</button>
+      <button class="tab" onclick="goTo('planning')">📅</button>
+      <button class="tab" onclick="goTo('storingen')">⚠️${openStoringen > 0 ? `<span class="badge">${openStoringen}</span>` : ''}</button>
       <button class="tab active" onclick="goTo('settings')">⚙️</button>
     </div>
 
@@ -1811,7 +2115,7 @@ function renderSettings(main) {
     <div class="card">
       <p class="card-title">ℹ️ Over</p>
       <p style="font-size: 13px; color: var(--text-muted);">
-        Universele onderhoudsapp v0.9 – Met PDF-export per locatie.
+        Universele onderhoudsapp v1.0 – Met planningmatrix en agenda-export.
       </p>
       <p style="font-size: 12px; color: var(--text-muted);">
         ${locations.length} locaties (${locations.filter(l=>l.shareCode).length} gedeeld) • ${items.length} onderdelen • ${klussen.length} klussen • ${storingen.length} storingen
