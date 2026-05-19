@@ -2292,7 +2292,7 @@ function renderSettings(main) {
     <div class="card">
       <p class="card-title">ℹ️ Over</p>
       <p style="font-size: 13px; color: var(--text-muted);">
-        Universele onderhoudsapp v1.3 – Met aantal en spreiding per onderdeel.
+        Universele onderhoudsapp v1.4 – Betere plantenherkenning (route 1 gereed, Pl@ntNet komt eraan).
       </p>
       <p style="font-size: 12px; color: var(--text-muted);">
         ${locations.length} locaties (${locations.filter(l=>l.shareCode).length} gedeeld) • ${items.length} onderdelen • ${klussen.length} klussen • ${storingen.length} storingen
@@ -2795,19 +2795,26 @@ async function analyzeImageQuick() {
     const country = locations.find(l => l.id === view.locationId)?.country || 'NL';
     const normLabel = { NL: 'Nederlandse NEN/NTA', BE: 'Belgische NBN', DE: 'Duitse DIN', EU: 'Europese EN/ISO' }[country] || 'Nederlandse NEN';
 
-    const prompt = `Je analyseert een foto van iets dat onderhoud kan vereisen. Dit kan van alles zijn: technische installaties (sprinklerkop, brandblusser, CV-ketel, ventilatie, rookmelder), tuingereedschap of tuinplanten (heggenschaar, grasmaaier, struik, boom, haag, fruitplant), gebouwonderdelen (radiator, kozijn, dakgoot), of huishoudelijke apparaten.
+    const prompt = `Je analyseert een foto van iets dat onderhoud kan vereisen. Dit kan van alles zijn: technische installaties (sprinklerkop, brandblusser, CV-ketel, ventilatie, rookmelder), tuingereedschap, planten (struik, boom, haag, fruitplant, perkplant, bloem), gebouwonderdelen (radiator, kozijn, dakgoot), of huishoudelijke apparaten.
+
+BELANGRIJK voor planten/groene aanplant:
+- Geef de meest waarschijnlijke soort, indien mogelijk met wetenschappelijke naam tussen haakjes (bv. "Hortensia (Hydrangea macrophylla)")
+- Als je twijfelt tussen meerdere mogelijkheden, geef je beste gok maar zet "(mogelijk: X of Y)" in de toelichting
+- Voor onderhoudsfrequentie van planten: kijk specifiek naar snoeitijden, watergeefroutine, mest, herfstopruiming
+- Let op kenmerken: bladvorm, bladstand, eventuele bloemen of vruchten, groeiwijze (kruipend/staand/klimmend), grootte t.o.v. omgeving
+- Als je echt niet zeker bent welke plant het is, zeg dat eerlijk en geef algemeen onderhoudsadvies voor het type plant (bv. "loofboom", "vaste plant", "klimplant")
 
 Geef ALLEEN een JSON-object terug met deze velden:
-- naam (string): korte Nederlandse beschrijving
-- fabrikant (string): fabrikant indien zichtbaar, anders ""
-- type (string): model/type indien zichtbaar, anders ""
-- afmeting (string): geschatte afmeting/diameter/inhoud indien zichtbaar of typisch voor dit product (bv. "Ø 15 mm", "6 kg", "80x60 cm"), anders ""
-- aantal (number): aantal zichtbaar op de foto (tel ze) of 1 als slechts één exemplaar zichtbaar is
+- naam (string): korte Nederlandse beschrijving — voor planten met wetenschappelijke naam tussen haakjes indien herkend
+- fabrikant (string): fabrikant indien zichtbaar (alleen relevant voor producten, leeg bij planten)
+- type (string): model/type indien zichtbaar (alleen relevant voor producten, leeg bij planten)
+- afmeting (string): geschatte afmeting/diameter/inhoud indien zichtbaar of typisch (bv. "Ø 15 mm", "6 kg", "hoogte ± 2m"), anders ""
+- aantal (number): aantal zichtbare exemplaren (tel ze) of 1
 - frequentieDagen (number): één van 30, 90, 180, 365, 730, of 1825 — gebruik je kennis van gangbare onderhoudsfrequenties
-- norm (string): relevante ${normLabel}-norm OF advies-bron (bv. "NEN 2559", "Tuinexpert-advies"), anders ""
+- norm (string): relevante ${normLabel}-norm OF advies-bron (bv. "NEN 2559", "Snoei-richtlijn Tuinbranche Nederland"), anders ""
 - datasheet (string): lege string "" (vereist Search, gebruik Uitgebreide modus)
-- taken (array van strings): 3-6 standaard controletaken die bij dit onderhoud horen
-- toelichting (string): één zin over wat het is en welk onderhoud nodig is`;
+- taken (array van strings): 3-6 concrete controle/onderhoudstaken. Voor planten bv. ["Snoeien na bloei", "Mulchlaag controleren", "Watergeefroutine", "Bladluis-controle"]
+- toelichting (string): één zin over wat het is en welk onderhoud nodig is, voor planten incl. beste seizoen`;
 
     const text = await callGemini([
       { text: prompt },
@@ -2840,19 +2847,30 @@ async function analyzeImageWithSearch() {
 
     if (loadingDiv) loadingDiv.textContent = '✨ AI bekijkt de foto en zoekt onderhoudsadvies...';
 
-    const stap1Prompt = `Je analyseert een foto van iets dat onderhoud kan vereisen. Dit kan van alles zijn: technische installaties (sprinklerkop, brandblusser, CV-ketel, ventilatie, rookmelder), tuingereedschap of tuinplanten (heggenschaar, grasmaaier, struik, boom, haag), gebouwonderdelen (radiator, kozijn, dakgoot), of huishoudelijke apparaten.
+    const stap1Prompt = `Je analyseert een foto van iets dat onderhoud kan vereisen. Dit kan van alles zijn: technische installaties (sprinklerkop, brandblusser, CV-ketel, ventilatie, rookmelder), tuingereedschap, planten (struik, boom, haag, perkplant, fruitplant, bloem), gebouwonderdelen (radiator, kozijn, dakgoot), of huishoudelijke apparaten.
 
-Gebruik Google Search om actuele en betrouwbare informatie te vinden over het onderhoud van dit specifieke type onderdeel volgens ${normLabel} normen, technische bulletins, of erkende vakliteratuur (bij planten/tuin: tuinexpertbronnen).
+Bekijk de foto goed en bepaal eerst wát het is.
+
+Als het een PLANT is:
+- Identificeer de soort zo nauwkeurig mogelijk (Nederlandse + wetenschappelijke naam)
+- Let op: bladvorm, bladstand, bloemen, vruchten, groeiwijze, grootte
+- Gebruik Google Search om correct snoei- en onderhoudsadvies te vinden van betrouwbare bronnen (Tuinbranche Nederland, Velt, Plantsoenbeheer, hoveniersverenigingen, universiteiten zoals Wageningen)
+- Vermeld het beste seizoen voor snoei/onderhoud
+- Bij twijfel over soort: geef je beste gok + alternatieven
+
+Als het een PRODUCT/INSTALLATIE is:
+- Gebruik Google Search voor ${normLabel} normen, technische bulletins, of erkende vakliteratuur
+- Geef ook eventueel datasheet-link van fabrikant
 
 Geef in het Nederlands antwoord met:
-1. Wat zie je op de foto? (naam, eventueel fabrikant/type)
-2. Aantal zichtbare exemplaren (tel ze, of "1" bij enkel exemplaar)
-3. Afmeting/diameter (indien af te leiden uit foto of typisch voor het product)
-4. Wat is de aanbevolen onderhoudsfrequentie?
-5. Welke specifieke norm of technisch bulletin is van toepassing, OF welke bron geeft dit advies?
-6. Een URL naar een datasheet/handleiding op de fabrikantenwebsite (indien gevonden)
-7. Een lijst van 3-6 concrete controletaken die uitgevoerd moeten worden bij elke onderhoudsbeurt
-8. Korte toelichting (1-2 zinnen) over wat het onderhoud inhoudt en wanneer het beste uitgevoerd wordt.`;
+1. Wat zie je op de foto? (naam, voor plant: NL + Latijn; voor product: naam/fabrikant/type)
+2. Aantal zichtbare exemplaren
+3. Afmeting/diameter/grootte (indien af te leiden)
+4. Aanbevolen onderhoudsfrequentie
+5. Welke norm, bulletin of vakbron geeft dit advies?
+6. Voor producten: URL naar datasheet (als gevonden). Voor planten: lege string.
+7. Concrete controle- of onderhoudstaken (3-6 stuks)
+8. Korte toelichting met seizoen/timing.`;
 
     const stap1Result = await callGemini([
       { text: stap1Prompt },
