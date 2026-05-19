@@ -8,6 +8,9 @@
 <!-- Firebase SDK (compat-versie, werkt zonder bundler) -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
+<!-- jsPDF voor PDF-export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <style>
   :root {
     --bg: #f5f7fa;
@@ -1099,7 +1102,10 @@ function renderLocationDetail(main, loc) {
           <p style="margin:0 0 4px;font-size:12px;color:var(--text-muted);">${loc.context === 'zakelijk' ? 'Zakelijk' : 'Privé'} • ${countryLabel(loc.country)}</p>
           <p style="margin:0;font-size:13px;">${escapeHtml(loc.address || '—')}</p>
         </div>
-        <button class="btn btn-secondary btn-small" onclick="editLocation(${loc.id})">Bewerken</button>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <button class="btn btn-secondary btn-small" onclick="editLocation(${loc.id})">Bewerken</button>
+          <button class="btn btn-secondary btn-small" onclick="exportLocationPDF(${loc.id})">📄 PDF</button>
+        </div>
       </div>
     </div>
 
@@ -1805,7 +1811,7 @@ function renderSettings(main) {
     <div class="card">
       <p class="card-title">ℹ️ Over</p>
       <p style="font-size: 13px; color: var(--text-muted);">
-        Universele onderhoudsapp v0.8 – Met afmeting, datasheet-link en afvinkbare controletaken.
+        Universele onderhoudsapp v0.9 – Met PDF-export per locatie.
       </p>
       <p style="font-size: 12px; color: var(--text-muted);">
         ${locations.length} locaties (${locations.filter(l=>l.shareCode).length} gedeeld) • ${items.length} onderdelen • ${klussen.length} klussen • ${storingen.length} storingen
@@ -2561,6 +2567,300 @@ function renderEmails() {
   div.innerHTML = emails.map(e =>
     `<span class="email-tag">${escapeHtml(e)} <button onclick="removeEmail('${escapeHtml(e)}')">×</button></span>`
   ).join('');
+}
+
+// ============ PDF EXPORT ============
+async function exportLocationPDF(locId) {
+  const loc = locations.find(l => l.id === locId);
+  if (!loc) return;
+
+  const locItems = items.filter(i => i.locationId === locId);
+  const locKlussen = klussen.filter(k => k.locationId === locId);
+  const locStoringen = storingen.filter(s => s.locationId === locId);
+
+  // Vraag wat erin moet
+  let includeKlussen = false, includeStoringen = false;
+  if (locKlussen.length > 0 || locStoringen.length > 0) {
+    includeKlussen = confirm(`Klussen meenemen in PDF? (${locKlussen.length} klussen)\n\nOK = ja, Annuleer = nee`);
+    if (locStoringen.length > 0) {
+      includeStoringen = confirm(`Storingen meenemen in PDF? (${locStoringen.length} storingen)\n\nOK = ja, Annuleer = nee`);
+    }
+  }
+
+  if (locItems.length === 0 && !includeKlussen && !includeStoringen) {
+    alert('Geen gegevens om te exporteren.');
+    return;
+  }
+
+  // Check of jsPDF geladen is
+  if (typeof window.jspdf === 'undefined') {
+    alert('PDF-bibliotheek nog niet geladen. Probeer opnieuw over een paar seconden.');
+    return;
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+  // === KOP ===
+  const today = new Date();
+  const todayStr = today.toLocaleDateString('nl-NL', { day: '2-digit', month: 'long', year: 'numeric' });
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.setTextColor(12, 74, 110); // primary kleur
+  doc.text('Onderhoudsoverzicht', 14, 18);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(11);
+  doc.setTextColor(60, 60, 60);
+  doc.text(loc.name, 14, 26);
+  if (loc.address) doc.text(loc.address, 14, 31);
+
+  doc.setFontSize(9);
+  doc.setTextColor(120, 120, 120);
+  doc.text(`Gegenereerd op ${todayStr}`, 14, 38);
+  doc.text(`${loc.context === 'zakelijk' ? 'Zakelijk' : 'Privé'} • ${countryLabel(loc.country)} • ${locItems.length} onderdelen`, 14, 43);
+
+  let y = 52;
+
+  // === ONDERDELEN ===
+  if (locItems.length > 0) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(12, 74, 110);
+    doc.text('🔧 Onderdelen', 14, y);
+    y += 4;
+
+    // Sorteer op volgende datum
+    const sorted = [...locItems].sort((a,b) => new Date(a.nextDate || '9999-12-31') - new Date(b.nextDate || '9999-12-31'));
+
+    const rows = sorted.map(item => {
+      const due = item.nextDate ? new Date(item.nextDate) : null;
+      const todayMidnight = new Date(); todayMidnight.setHours(0,0,0,0);
+      let status = '';
+      if (due) {
+        const days = Math.floor((due - todayMidnight) / (1000*60*60*24));
+        if (days < 0) status = `${-days} dgn over`;
+        else if (days === 0) status = 'vandaag';
+        else status = `over ${days} dgn`;
+      }
+      const taken = (item.tasks || []);
+      const tasksDone = taken.filter(t => t.done).length;
+      const tasksTotal = taken.length;
+      return [
+        '', // foto-kolom (vullen we later met didDrawCell)
+        item.name + (item.room ? '\n' + item.room : ''),
+        [item.manufacturer, item.type, item.dimension].filter(Boolean).join(' '),
+        item.norm || '',
+        frequencyLabel(item.frequency),
+        formatDateShort(item.nextDate),
+        status,
+        tasksTotal > 0 ? `${tasksDone}/${tasksTotal}` : ''
+      ];
+    });
+
+    doc.autoTable({
+      startY: y,
+      head: [['Foto', 'Onderdeel', 'Fabrikant / type', 'Norm', 'Frequentie', 'Volgende', 'Status', 'Taken']],
+      body: rows,
+      theme: 'grid',
+      headStyles: {
+        fillColor: [12, 74, 110],
+        textColor: 255,
+        fontSize: 8,
+        fontStyle: 'bold'
+      },
+      bodyStyles: { fontSize: 8, minCellHeight: 14, valign: 'middle' },
+      columnStyles: {
+        0: { cellWidth: 14 },
+        1: { cellWidth: 35 },
+        2: { cellWidth: 30 },
+        3: { cellWidth: 22 },
+        4: { cellWidth: 20 },
+        5: { cellWidth: 18 },
+        6: { cellWidth: 18 },
+        7: { cellWidth: 14, halign: 'center' }
+      },
+      margin: { left: 10, right: 10 },
+      didDrawCell: (data) => {
+        // Plaats foto in eerste kolom
+        if (data.section === 'body' && data.column.index === 0) {
+          const item = sorted[data.row.index];
+          if (item && item.photo) {
+            try {
+              const x = data.cell.x + 1;
+              const yC = data.cell.y + 1;
+              const w = data.cell.width - 2;
+              const h = data.cell.height - 2;
+              doc.addImage(item.photo, 'JPEG', x, yC, w, h);
+            } catch (e) {
+              console.warn('Foto kon niet ingevoegd worden:', e);
+            }
+          }
+        }
+      }
+    });
+
+    y = doc.lastAutoTable.finalY + 8;
+
+    // Detailpagina met taken/notities indien er taken zijn
+    const itemsWithTasks = sorted.filter(i => (i.tasks && i.tasks.length > 0) || i.notes || i.datasheet);
+    if (itemsWithTasks.length > 0) {
+      if (y > 250) { doc.addPage(); y = 20; }
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.setTextColor(12, 74, 110);
+      doc.text('Controletaken & notities per onderdeel', 14, y);
+      y += 6;
+
+      itemsWithTasks.forEach(item => {
+        // Schat hoeveel ruimte we nodig hebben
+        const needed = 8 + (item.tasks?.length || 0) * 4 + (item.notes ? 6 : 0) + (item.datasheet ? 4 : 0);
+        if (y + needed > 280) { doc.addPage(); y = 20; }
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(40, 40, 40);
+        doc.text(item.name + (item.room ? ' (' + item.room + ')' : ''), 14, y);
+        y += 4;
+
+        if (item.tasks && item.tasks.length > 0) {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(8);
+          doc.setTextColor(80, 80, 80);
+          item.tasks.forEach(t => {
+            const check = t.done ? '[x]' : '[ ]';
+            doc.text(`  ${check} ${t.text}`, 14, y);
+            y += 4;
+          });
+        }
+        if (item.notes) {
+          doc.setFont('helvetica', 'italic');
+          doc.setFontSize(8);
+          doc.setTextColor(80, 80, 80);
+          const lines = doc.splitTextToSize('Notitie: ' + item.notes, 180);
+          doc.text(lines, 14, y);
+          y += lines.length * 3.5;
+        }
+        if (item.datasheet) {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(7);
+          doc.setTextColor(12, 74, 110);
+          doc.textWithLink('📄 Datasheet/handleiding', 14, y, { url: item.datasheet });
+          y += 4;
+        }
+        y += 2;
+      });
+    }
+  }
+
+  // === KLUSSEN ===
+  if (includeKlussen && locKlussen.length > 0) {
+    if (y > 240) { doc.addPage(); y = 20; }
+    y += 4;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(12, 74, 110);
+    doc.text('🛠️ Klussen', 14, y);
+    y += 4;
+
+    const order = { 'open': 0, 'bezig': 1, 'klaar': 2 };
+    const sortedK = [...locKlussen].sort((a,b) => (order[a.status]||0) - (order[b.status]||0));
+
+    const kRows = sortedK.map(k => {
+      const totaal = (k.bestellijst || []).reduce((s,o) => s + (parseFloat(o.prijs) || 0) * (parseInt(o.aantal) || 1), 0);
+      return [
+        k.title,
+        klusStatusLabel(k.status),
+        k.prio === 'hoog' ? 'Hoog' : (k.prio === 'laag' ? 'Laag' : 'Normaal'),
+        formatDateShort(k.deadline),
+        totaal > 0 ? '€ ' + totaal.toFixed(2).replace('.', ',') : ''
+      ];
+    });
+
+    doc.autoTable({
+      startY: y,
+      head: [['Klus', 'Status', 'Prio', 'Deadline', 'Raming']],
+      body: kRows,
+      theme: 'grid',
+      headStyles: { fillColor: [124, 58, 237], textColor: 255, fontSize: 8 },
+      bodyStyles: { fontSize: 8 },
+      margin: { left: 10, right: 10 }
+    });
+    y = doc.lastAutoTable.finalY + 8;
+  }
+
+  // === STORINGEN ===
+  if (includeStoringen && locStoringen.length > 0) {
+    if (y > 240) { doc.addPage(); y = 20; }
+    y += 4;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(217, 119, 6); // oranje
+    doc.text('⚠️ Storingen', 14, y);
+    y += 4;
+
+    const order = { 'open': 0, 'behandeling': 1, 'opgelost': 2 };
+    const sortedS = [...locStoringen].sort((a,b) => (order[a.status]||0) - (order[b.status]||0));
+
+    const sRows = sortedS.map(s => {
+      const item = s.itemId ? items.find(i => i.id === s.itemId) : null;
+      return [
+        s.title,
+        s.description.length > 60 ? s.description.substring(0, 60) + '…' : s.description,
+        item ? item.name : '',
+        storingStatusLabel(s.status).replace(/[📋🔧✓⚡]/g, '').trim(),
+        s.prio === 'hoog' ? 'Hoog' : 'Normaal',
+        formatDateShort(s.createdAt)
+      ];
+    });
+
+    doc.autoTable({
+      startY: y,
+      head: [['Titel', 'Omschrijving', 'Onderdeel', 'Status', 'Prio', 'Gemeld']],
+      body: sRows,
+      theme: 'grid',
+      headStyles: { fillColor: [217, 119, 6], textColor: 255, fontSize: 8 },
+      bodyStyles: { fontSize: 7 },
+      columnStyles: {
+        0: { cellWidth: 30 },
+        1: { cellWidth: 60 },
+        2: { cellWidth: 30 },
+        3: { cellWidth: 22 },
+        4: { cellWidth: 15 },
+        5: { cellWidth: 22 }
+      },
+      margin: { left: 10, right: 10 }
+    });
+  }
+
+  // === FOOTER op elke pagina ===
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(7);
+    doc.setTextColor(140, 140, 140);
+    doc.text(`${loc.name} • ${todayStr} • pagina ${i} van ${pageCount}`, 14, 290);
+    doc.text('Gegenereerd met Onderhoudsapp', 200, 290, { align: 'right' });
+  }
+
+  // Bestandsnaam
+  const safeName = loc.name.replace(/[^a-z0-9-_]/gi, '_').substring(0, 40);
+  doc.save(`Onderhoud_${safeName}_${today.toISOString().split('T')[0]}.pdf`);
+}
+
+function frequencyLabel(days) {
+  return { 30: 'Maandelijks', 90: 'Per kwartaal', 180: 'Halfjaarlijks', 365: 'Jaarlijks', 730: 'Tweejaarlijks', 1825: 'Elke 5 jaar' }[days] || (days ? days + ' dgn' : '');
+}
+
+function klusStatusLabel(s) {
+  return { open: 'Open', bezig: 'Bezig', klaar: 'Klaar' }[s] || s;
+}
+
+function formatDateShort(d) {
+  if (!d) return '';
+  const dt = new Date(d);
+  return dt.toLocaleDateString('nl-NL', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 function exportData() {
